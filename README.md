@@ -7,7 +7,7 @@ domínio real de engenharia de software.
 
 | | |
 |---|---|
-| **Autor** | Marcus Vinícius Santos de Almeida |
+| **Autor** | Marcus Viníicius Santos de Almeida |
 | **Disciplina** | Mineração de Dados |
 | **Entrega** | 04/09/2026 |
 | **Banco de dados** | SQLite (sem dependências externas) |
