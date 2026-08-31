@@ -1,0 +1,7 @@
+caso_id,proposito,complexidade,loc,n_autores,churn,n_imports,cobertura,intuicao_esperada
+caso_a_baixo_risco,(a) Baixo risco claro: indicadores bons em todas as 6 features,baixo,medio,baixo,baixo,baixo,alto,BAIXO RISCO
+caso_b_alto_risco,(b) Alto risco claro: indicadores ruins em todas as 6 features,alto,alto,alto,alto,alto,baixo,ALTO RISCO
+caso_c_ambiguo,(c) Ambiguo: complexidade alta e cobertura alta ao mesmo tempo; resto no meio,alto,medio,medio,medio,medio,alto,INDEFINIDO (perto de 50/50)
+caso_d_koru_pequeno_denso,(d) Armadilha de Koru: arquivo pequeno (LOC baixo) porem denso (complexidade alta),alto,baixo,medio,medio,medio,medio,ALTO RISCO (pequeno nao e seguro)
+caso_e_raro_laplace,(e) Combinacao rara/fronteira: arquivo grande porem simples + churn alto + resto bom,baixo,alto,baixo,alto,baixo,alto,BAIXO/INDEFINIDO
+caso_f_cobertura_contestada,(f) Feature contestada: alto risco em tudo exceto cobertura de testes (alta),alto,alto,alto,alto,alto,alto,ALTO RISCO (cobertura nao deve salvar)

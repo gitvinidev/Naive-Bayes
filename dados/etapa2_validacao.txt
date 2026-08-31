@@ -1,0 +1,52 @@
+======================================================================
+VALIDAÇÃO DA MASSA DE DADOS SINTÉTICA — ETAPA 2
+======================================================================
+Parâmetros: N_REGISTROS=150  SEED=42  PROPORCAO_DEFEITO=0.35
+
+(a) PROPORÇÃO DE CLASSES
+    SIM :  52  ( 34.7%)
+    NAO :  98  ( 65.3%)
+
+(b) MATRIZ DE CORRELAÇÃO DE PEARSON (features numéricas)
+                          complexidade_ciclomatica    loc  n_autores  churn_relativo  n_imports  cobertura_testes
+complexidade_ciclomatica                     1.000  0.666      0.193          -0.080      0.118             0.114
+loc                                          0.666  1.000      0.285          -0.109      0.195            -0.041
+n_autores                                    0.193  0.285      1.000          -0.097      0.016             0.093
+churn_relativo                              -0.080 -0.109     -0.097           1.000      0.159            -0.082
+n_imports                                    0.118  0.195      0.016           0.159      1.000            -0.110
+cobertura_testes                             0.114 -0.041      0.093          -0.082     -0.110             1.000
+
+    -> Correlação LOC x complexidade ciclomática = 0.666  (programada de propósito — Shepperd, 1988)
+    -> Correlação LOC x nº de imports            = 0.195  (esperada: leve)
+    -> Correlação LOC x churn relativo           = -0.109  (esperada: ~0 — churn é taxa)
+
+(c) ESTATÍSTICAS DESCRITIVAS (valor bruto de cada feature)
+                            mean     std   min  median     max
+complexidade_ciclomatica   17.58   20.56   1.0    10.0   120.0
+loc                       122.22  146.15  12.0    87.5  1434.0
+n_autores                   2.40    1.26   1.0     2.0     7.0
+churn_relativo             13.52   11.68   0.7    10.5    85.0
+n_imports                   6.31    3.54   1.0     5.5    22.0
+cobertura_testes           61.13   18.65  15.6    63.5    99.0
+
+(d) CHECAGEM DOS PADRÕES PROGRAMADOS  (taxa de defeito = P(SIM))
+    Taxa geral de defeito ....................  34.7%
+    LOC          : baixo=  38%  medio=  30%  alto=  50%
+    Complexidade : baixo=  15%  medio=  38%  alto=  70%
+    Churn rel.   : baixo=  29%  medio=  38%  alto=  46%
+    Nº autores   : baixo=  24%  medio=  35%  alto=  52%
+    Nº imports   : baixo=  24%  medio=  32%  alto=  55%
+    Cobertura    : baixo=  29%  medio=  39%  alto=  32%
+
+    Módulos 'pequeno e denso' (LOC baixo + complexidade alta): n=8
+      taxa de defeito nesse grupo ........... 100.0%   (esperado: bem acima da taxa geral — Koru et al.)
+
+(e) DISTRIBUIÇÃO DAS CATEGORIAS
+    loc_cat               : baixo= 39  medio= 93  alto= 18
+    complexidade_cat      : baixo= 78  medio= 32  alto= 40
+    n_autores_cat         : baixo= 41  medio= 84  alto= 25
+    churn_relativo_cat    : baixo= 69  medio= 68  alto= 13
+    n_imports_cat         : baixo= 29  medio= 92  alto= 29
+    cobertura_testes_cat  : baixo= 42  medio= 83  alto= 25
+
+======================================================================
