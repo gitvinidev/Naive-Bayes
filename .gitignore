@@ -1,0 +1,23 @@
+# Banco de dados SQLite — é reconstruído do zero a cada execução
+dados/classificador.db
+
+# Cache do Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Ambiente virtual, caso venha a criar um
+.venv/
+venv/
+env/
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*~
