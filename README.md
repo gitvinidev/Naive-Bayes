@@ -91,37 +91,48 @@ em [`relatorios/etapa3_classificador.pdf`](relatorios/etapa3_classificador.pdf).
 
 ## Resultados
 
+Massa de treino gerada com as 6 features **independentes entre si** (decisão
+de projeto "Naive Bayes puro" — ver `CLAUDE.md`); só o rótulo depende das
+features.
+
 | Caso | Perfil | P(SIM) | Recomendação |
 |---|---|---|---|
-| a — baixo risco claro | tudo bom | 4,17% | BAIXO RISCO |
-| b — alto risco claro | tudo ruim | 95,61% | ALTO RISCO |
-| c — ambíguo | complexidade alta × cobertura alta | 61,13% | ALTO RISCO (fronteira) |
-| d — "armadilha" de Koru et al. | arquivo pequeno e denso | 74,40% | ALTO RISCO |
-| e — combinação rara | grande, simples, churn alto | 17,12% | BAIXO RISCO |
-| f — feature contestada | tudo ruim + cobertura alta | 96,29% | ALTO RISCO |
+| a — baixo risco claro | tudo bom | 4,28% | BAIXO RISCO |
+| b — alto risco claro | tudo ruim | 95,53% | ALTO RISCO |
+| c — ambíguo | complexidade alta × cobertura alta | 38,04% | BAIXO RISCO (fronteira) |
+| d — "armadilha" de Koru et al., sem bônus de interação | arquivo pequeno e denso | 55,52% | ALTO RISCO (por pouco) |
+| e — combinação rara | grande, simples, churn alto | 22,14% | BAIXO RISCO |
+| f — feature contestada | tudo ruim + cobertura alta | 92,64% | ALTO RISCO |
 
 **Poder discriminativo das features** (ranking por \|log-odds\| médio):
-complexidade ciclomática (0,857) > nº de imports (0,467) > nº de autores
-(0,386) > LOC (0,328) > churn relativo (0,292) > cobertura de testes (0,167).
+nº de autores (0,695) > complexidade ciclomática (0,595) > churn relativo
+(0,482) > LOC (0,285) > cobertura de testes (0,227) > nº de imports (0,180).
 
 Análise completa dos 6 casos, decomposição em log-odds e reflexão crítica em
 [`relatorios/etapa4_resultados.pdf`](relatorios/etapa4_resultados.pdf).
 
 ## Limitações conhecidas
 
-- **Violação de independência (complexidade × LOC).** As duas features têm
-  correlação empírica alta (R² ≈ 0,93 na literatura; 0,67 de Pearson nos
-  dados deste projeto) — o modelo conta a evidência de tamanho/estrutura
-  praticamente duas vezes.
+- **A independência entre features testada aqui é verdadeira por construção,
+  não por realismo.** Os dados sintéticos são gerados com as 6 features
+  independentes entre si — a matriz de correlação confirma |r| < 0,10 em
+  todos os pares. Isso valida a implementação do classificador no cenário
+  ideal, mas não reflete um cenário real de implantação: em código real,
+  complexidade ciclomática e LOC são fortemente correlacionadas (R² ≈ 0,93 —
+  Shepperd, 1988), e um Naive Bayes treinado sobre dados reais contaria essa
+  evidência de tamanho/estrutura praticamente duas vezes. É uma limitação
+  **teórica, documentada na literatura**, não uma violação encontrada nestes
+  dados.
 - **Relação não-linear de LOC com risco.** Arquivos pequenos são
   proporcionalmente mais propensos a defeito (Koru et al., 2008) — "menor"
-  não é sinônimo de "mais seguro".
+  não é sinônimo de "mais seguro". Essa relação é de cada feature isolada e
+  continua presente mesmo com os dados independentes.
 - **Cobertura de testes é uma feature de evidência contestada** — mantida de
   propósito para ser analisada criticamente, não por forte poder preditivo.
 - **Módulo = arquivo, não classe.** Simplificação deliberada frente ao estudo
   de referência, que usa classe como unidade.
-- **Dados de treinamento sintéticos**, gerados por script com padrões
-  programados a partir da literatura (exigência da atividade).
+- **Dados de treinamento sintéticos**, com o rótulo gerado a partir de pesos
+  por categoria de cada feature (exigência da atividade).
 
 Discussão completa de cada ponto no relatório da Etapa 4.
 

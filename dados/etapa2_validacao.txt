@@ -8,45 +8,51 @@ Parâmetros: N_REGISTROS=150  SEED=42  PROPORCAO_DEFEITO=0.35
     NAO :  98  ( 65.3%)
 
 (b) MATRIZ DE CORRELAÇÃO DE PEARSON (features numéricas)
+    Esperado: todos os |r| próximos de 0 — as 6 features são
+    geradas independentes entre si por decisão de projeto
+    ("Naive Bayes puro", ver CLAUDE.md). Valores não-nulos aqui
+    são ruído amostral (N=150), não dependência estrutural.
                           complexidade_ciclomatica    loc  n_autores  churn_relativo  n_imports  cobertura_testes
-complexidade_ciclomatica                     1.000  0.666      0.193          -0.080      0.118             0.114
-loc                                          0.666  1.000      0.285          -0.109      0.195            -0.041
-n_autores                                    0.193  0.285      1.000          -0.097      0.016             0.093
-churn_relativo                              -0.080 -0.109     -0.097           1.000      0.159            -0.082
-n_imports                                    0.118  0.195      0.016           0.159      1.000            -0.110
-cobertura_testes                             0.114 -0.041      0.093          -0.082     -0.110             1.000
+complexidade_ciclomatica                     1.000  0.010     -0.003           0.074      0.084            -0.002
+loc                                          0.010  1.000     -0.043          -0.063      0.038             0.057
+n_autores                                   -0.003 -0.043      1.000          -0.069     -0.087            -0.040
+churn_relativo                               0.074 -0.063     -0.069           1.000     -0.010             0.011
+n_imports                                    0.084  0.038     -0.087          -0.010      1.000            -0.037
+cobertura_testes                            -0.002  0.057     -0.040           0.011     -0.037             1.000
 
-    -> Correlação LOC x complexidade ciclomática = 0.666  (programada de propósito — Shepperd, 1988)
-    -> Correlação LOC x nº de imports            = 0.195  (esperada: leve)
-    -> Correlação LOC x churn relativo           = -0.109  (esperada: ~0 — churn é taxa)
+    -> Maior |r| da matriz: Nº de autores x Nº de imports = -0.087
 
 (c) ESTATÍSTICAS DESCRITIVAS (valor bruto de cada feature)
                             mean     std   min  median     max
-complexidade_ciclomatica   17.58   20.56   1.0    10.0   120.0
-loc                       122.22  146.15  12.0    87.5  1434.0
-n_autores                   2.40    1.26   1.0     2.0     7.0
-churn_relativo             13.52   11.68   0.7    10.5    85.0
-n_imports                   6.31    3.54   1.0     5.5    22.0
-cobertura_testes           61.13   18.65  15.6    63.5    99.0
+complexidade_ciclomatica   13.03   11.25   2.0    10.0    92.0
+loc                       141.77  151.64  14.0    98.5  1068.0
+n_autores                   2.56    1.16   1.0     2.5     5.0
+churn_relativo             13.63    9.96   2.5    10.0    48.8
+n_imports                   8.20    5.21   1.0     7.0    34.0
+cobertura_testes           65.62   19.93  22.4    64.5    99.0
 
-(d) CHECAGEM DOS PADRÕES PROGRAMADOS  (taxa de defeito = P(SIM))
+(d) TAXA DE DEFEITO POR CATEGORIA, FEATURE A FEATURE  (P(SIM))
+    (cada feature isolada ainda influencia o rótulo por construção;
+     o que deixou de existir é dependência ENTRE as features)
     Taxa geral de defeito ....................  34.7%
-    LOC          : baixo=  38%  medio=  30%  alto=  50%
-    Complexidade : baixo=  15%  medio=  38%  alto=  70%
-    Churn rel.   : baixo=  29%  medio=  38%  alto=  46%
-    Nº autores   : baixo=  24%  medio=  35%  alto=  52%
-    Nº imports   : baixo=  24%  medio=  32%  alto=  55%
-    Cobertura    : baixo=  29%  medio=  39%  alto=  32%
+    LOC          : baixo=  46%  medio=  29%  alto=  38%
+    Complexidade : baixo=  22%  medio=  45%  alto=  54%
+    Churn rel.   : baixo=  29%  medio=  35%  alto=  67%
+    Nº autores   : baixo=  16%  medio=  32%  alto=  61%
+    Nº imports   : baixo=  27%  medio=  33%  alto=  40%
+    Cobertura    : baixo=  44%  medio=  31%  alto=  31%
 
-    Módulos 'pequeno e denso' (LOC baixo + complexidade alta): n=8
-      taxa de defeito nesse grupo ........... 100.0%   (esperado: bem acima da taxa geral — Koru et al.)
+    Esperado: crescente com a categoria para complexidade, autores,
+    churn e imports; em U para LOC (Koru et al., 2008 — baixo E alto
+    mais arriscados que médio); fraco/quase plano para cobertura
+    (feature de evidência contestada) — ver pesos no topo do script.
 
 (e) DISTRIBUIÇÃO DAS CATEGORIAS
-    loc_cat               : baixo= 39  medio= 93  alto= 18
-    complexidade_cat      : baixo= 78  medio= 32  alto= 40
-    n_autores_cat         : baixo= 41  medio= 84  alto= 25
-    churn_relativo_cat    : baixo= 69  medio= 68  alto= 13
-    n_imports_cat         : baixo= 29  medio= 92  alto= 29
-    cobertura_testes_cat  : baixo= 42  medio= 83  alto= 25
+    loc_cat               : baixo= 35  medio= 86  alto= 29
+    complexidade_cat      : baixo= 77  medio= 49  alto= 24
+    n_autores_cat         : baixo= 32  medio= 85  alto= 33
+    churn_relativo_cat    : baixo= 75  medio= 63  alto= 12
+    n_imports_cat         : baixo= 15  medio= 87  alto= 48
+    cobertura_testes_cat  : baixo= 41  medio= 67  alto= 42
 
 ======================================================================

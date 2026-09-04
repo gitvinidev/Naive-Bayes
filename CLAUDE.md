@@ -39,19 +39,60 @@ foram removidas — ver histórico abaixo), então arquivo funciona como unidade
 universal, sem exigir ferramentas adicionais. Declarar essa simplificação no
 relatório.
 
+## DECISÃO DE PROJETO — "Naive Bayes puro" (features geradas independentes)
+
+**Esta é a decisão mais importante deste documento e afeta todos os relatórios.**
+
+Depois de considerar programar correlações entre features de propósito (para
+demonstrar violações de independência empiricamente), a decisão final foi
+**gerar todas as 6 features de forma estatisticamente independente entre si**
+no dataset sintético. Ou seja: nenhuma feature depende do valor de outra
+feature no gerador. Só o **rótulo** (SIM/NÃO) depende das features — isso é
+esperado e correto, é literalmente o que o Naive Bayes modela (P(feature|classe)).
+
+**Por que essa escolha:**
+- Testa o classificador no cenário em que sua própria suposição central
+  (independência condicional) é **verdadeira por construção** — o "Naive Bayes
+  em sua forma pura", sem contaminar o experimento com violações plantadas.
+- Simplifica o gerador, os relatórios e a defesa oral: menos nuances e
+  ressalvas para justificar.
+- É uma escolha de simulação legítima e deve ser **declarada como tal** — não
+  afirmar que о mundo real é assim. A literatura (Shepperd, 1988; R² ≈ 0,93
+  entre complexidade e LOC) documenta que, no mundo real, complexidade e LOC
+  são correlacionadas. Nossos dados sintéticos optam por não reproduzir essa
+  correlação, de propósito, para isolar o comportamento teórico do modelo.
+
+**Consequência para a Seção "Violações de Independência" (Etapa 1) e para a
+Reflexão Crítica (Etapa 4):** deixam de ser uma análise **empírica** (não há
+violação nos nossos dados para medir) e passam a ser uma análise **teórica /
+de limitação da simulação**. A tese correta agora é:
+
+> "Testamos o Naive Bayes no cenário ideal em que sua suposição de
+> independência é verdadeira. Nesse cenário, o modelo se comporta exatamente
+> como a teoria prevê — o que é bom para validar a implementação, mas não
+> reflete um cenário de implantação real, onde complexidade e LOC, por
+> exemplo, seriam correlacionadas (Shepperd, 1988). Isso não é uma limitação
+> encontrada nos dados, é uma limitação de realismo da simulação, assumida
+> conscientemente para isolar e verificar o comportamento teórico do
+> algoritmo."
+
+**NÃO fazer:** não reintroduzir nenhuma dependência entre features no gerador
+(nem tendência linear, nem subpopulação de interação, nem ruído correlacionado).
+Todas as 6 features devem ser sorteios estatisticamente independentes uns dos
+outros.
+
 ## As 6 features
 
-| # | Feature | Ferramenta | Fundamentação e pontos de atenção |
-|---|---------|------------|-------------------------------------|
-| 1 | Complexidade ciclomática | Radon (`radon cc`) | McCabe (1976) criou a métrica para apoiar desenho de casos de teste, não para prever defeitos diretamente. **Correlaciona fortemente com LOC** (R² ≈ 0.93 em estudo empírico) — Shepperd (1988) mostra que em muitos casos é só um proxy para LOC. Usar essa correlação como exemplo central de violação de independência do Naive Bayes na Etapa 4. |
-| 2 | Linhas de código (LOC) | Radon (`radon raw`) | Koru et al. (2008), *Theory of Relative Defect Proneness*: relação em lei de potência — módulos **menores** são proporcionalmente **mais** propensos a defeito (contraintuitivo). "Tamanho" no estudo é literalmente LOC. Nota metodológica: os autores evitaram calcular "densidade de defeitos" (bugs ÷ LOC) por gerar correlação negativa artificial; modelaram a probabilidade de defeito diretamente. Nosso rótulo é binário, então não corremos esse risco — mencionar como evidência de rigor na Etapa 4. Discretizar refletindo a relação não-linear. |
-| 3 | Número de autores distintos | PyDriller (`git log`) | Matsumoto et al. (2010): métricas de desenvolvedor melhoram a predição. Ver também Weyuker, Ostrand & Bell (2008), "Do Too Many Cooks Spoil the Broth?". |
-| 4 | Churn (frequência de alteração) | PyDriller | Nagappan & Ball (2005): usar churn **relativo** (proporcional ao tamanho do módulo), não absoluto — churn absoluto é fraco preditor e correlaciona com tamanho; a versão relativa foi desenhada para reduzir essa dependência. Ressalva: por ser uma razão, ainda existe risco teórico de correlação residual com tamanho (mesma lógica do artefato de densidade de defeitos) — mencionar como nuance, não como garantia. |
-| 5 | Número de imports/dependências externas | Módulo `ast` da biblioteca padrão do Python (não é ferramenta externa) | Substitui DIT/acoplamento (removidas). Mede acoplamento leve sem depender de classe. Um estudo recente mostrou que **acoplamento (CBO) na verdade correlaciona fortemente com tamanho** — reforça que a remoção de DIT/CBO também foi positiva do ponto de vista estatístico, não só de ferramenta. |
-| 6 | Cobertura de testes | Coverage.py | Evidência **contestada**: múltiplos estudos (incl. survey com 235 respostas de 7 organizações) encontram correlação nula ou muito fraca com defeitos. Não tratar como relação óbvia — mencionar a contestação na análise crítica. |
+| # | Feature | Ferramenta (uso real) | Fundamentação |
+|---|---------|------------------------|----------------|
+| 1 | Complexidade ciclomática | Radon (`radon cc`) | McCabe (1976): métrica de caminhos de execução, criada para apoiar desenho de testes. No mundo real correlaciona com LOC (Shepperd, 1988; R² ≈ 0,93) — nos nossos dados sintéticos, gerada independente por decisão de projeto (ver "Naive Bayes puro" acima). |
+| 2 | Linhas de código (LOC) | Radon (`radon raw`) | Métrica clássica de tamanho de código. Discretizada em 3 faixas simples (não há mais efeito de interação plantado — ver decisão acima). |
+| 3 | Número de autores distintos | PyDriller (`git log`) | Matsumoto et al. (2010): métricas de desenvolvedor melhoram a predição. Weyuker, Ostrand & Bell (2008), "Do Too Many Cooks Spoil the Broth?". |
+| 4 | Churn (frequência de alteração) | PyDriller | Nagappan & Ball (2005): usar churn **relativo** ao tamanho do módulo, não absoluto. Gerado como taxa independente das demais features. |
+| 5 | Número de imports/dependências externas | Módulo `ast` da biblioteca padrão do Python | Substitui DIT/acoplamento (removidas por dependerem de classe). Mede acoplamento leve. Gerado independente de LOC. |
+| 6 | Cobertura de testes | Coverage.py | Evidência **contestada** na literatura: múltiplos estudos (incl. survey com 235 respostas de 7 organizações) encontram correlação nula ou muito fraca com defeitos (Inozemtseva & Holmes, 2014; Gren & Antinyan, 2017). Gerada independente de churn. |
 
-6 features atende ao mínimo exigido (6 a 8). Não adicionar mais por ora — tempo
-é escasso e o conjunto já tem fundamentação e material crítico suficientes.
+6 features atende ao mínimo exigido (6 a 8). Não adicionar mais por ora.
 
 ## Discretização das features (3 categorias cada)
 
@@ -64,35 +105,54 @@ relatório.
 | 5 | Nº de imports/dependências externas | 0–3 | 4–8 | > 8 |
 | 6 | Cobertura de testes | < 50% | 50–80% | > 80% |
 
-Atenção ao montar as probabilidades condicionais: não assumir "LOC Alto = mais
-risco" isoladamente — pelo achado de Koru et al., a combinação LOC Baixo +
-Complexidade Alta deve ter risco elevado (pequeno e denso = arriscado).
+Sem efeito de interação entre LOC e complexidade (ver decisão "Naive Bayes
+puro"). Cada feature contribui para o rótulo de forma independente das demais.
 
 ## Geração da massa de dados de treinamento (Etapa 2)
+
 A atividade exige que os 100+ registros sejam **gerados por IA/sinteticamente**
 — não coletados de repositórios reais. Abordagem: gerar via **script Python**
-(não texto solto escrito por uma IA), programando deliberadamente os padrões
-already levantados, para cumprir a exigência de dados "intencionais e
-realistas" e alimentar a análise crítica da Etapa 4:
+(`dados/gerar_dados.py`), não texto solto escrito por uma IA.
 
-- Complexidade ciclomática e LOC nascem correlacionadas (Shepperd, 1988).
-- Módulos pequenos com complexidade alta têm risco elevado (Koru et al., 2008
-  — não assumir "mais LOC = mais risco" de forma linear).
-- Churn tratado como taxa relativa ao tamanho, não valor absoluto (Nagappan &
-  Ball, 2005).
-- Nº de imports pode ter correlação leve com LOC, mas mantendo variação
-  própria — não replicar a distribuição de LOC/complexidade.
-- Distribuição de classes (sim/não) razoável — evitar desbalanceamento extremo.
-- Ruído/variação controlada — nunca sorteio uniforme puro nem regra
-  determinística perfeita.
+**Modelo generativo (features 100% independentes entre si):**
+- Cada uma das 6 features é sorteada de sua própria distribuição, **sem depender
+  do valor de nenhuma outra feature**.
+- O **rótulo** (SIM/NÃO) é a única coisa que depende das features: calcular um
+  score de risco = soma de pesos (log-odds) por categoria de cada uma das 6
+  features + ruído gaussiano; os k = round(N × 0,35) módulos de maior score
+  recebem SIM.
+- Sem subpopulação de interação, sem tendência cruzada entre features, sem
+  ruído compartilhado entre colunas.
+- Distribuição de classes razoável (evitar desbalanceamento extremo) —
+  manter `PROPORCAO_DEFEITO ≈ 0,35`.
+- Ruído/variação controlada em cada feature — nunca sorteio uniforme puro nem
+  regra determinística perfeita.
+
+**Validação esperada (Etapa 2):** a matriz de correlação de Pearson entre as 6
+features numéricas deve sair com todos os valores de |r| próximos de 0 —
+isso é o resultado **desejado e esperado**, não um erro. A interpretação da
+matriz na Etapa 2 deve mudar de "confirma as correlações programadas" para
+"confirma que as features foram geradas independentes, como planejado".
 
 Radon e PyDriller ficam reservados para uso **opcional e ilustrativo** — por
 exemplo, rodar em um repositório pequeno do GitHub só para demonstrar no
 relatório que a coleta real seria factível, sem substituir os dados sintéticos.
 
+## Casos de teste (Etapa 4) — atenção ao caso "d"
+
+O caso **d** ("armadilha de Koru", LOC baixo + complexidade alta) perde a
+premissa de interação plantada. Reformular seu propósito: em vez de "provar
+que o modelo captura a interação pequeno-e-denso", o caso agora testa e
+demonstra que **sem** dependência plantada entre as features, o modelo
+simplesmente soma dois efeitos individuais moderados (LOC baixo tende a
+log-odds próximo de neutro; complexidade alta tem log-odds positivo) — sem
+nenhum "bônus" de interação. Isso é um resultado didático por si só: mostra
+o Naive Bayes se comportando exatamente como a teoria prevê (soma de efeitos
+marginais, sem interação), reforçando a nova tese da Reflexão Crítica.
+
 ## Convenções de output
-- Relatórios finais em `/relatorios/`, em **PDF** (via `reportlab` ou markdown +
-  `pandoc`), mantendo também o `.md` fonte.
+- Relatórios finais em `/relatorios/`, em **PDF** (via HTML/CSS + Playwright,
+  ou `reportlab`/`pandoc`), mantendo também o `.md` fonte.
 - Dados em `/dados/` (CSV).
 - Código SQL do classificador em `/sql/`.
 - Casos de teste e resultados em `/testes/`.
@@ -125,13 +185,25 @@ informação nova.
 Exigência explícita da Etapa 2 do enunciado — pedir dados reais seria
 descumprir a atividade, não uma limitação técnica.
 
-**Qual a maior violação de independência do Naive Bayes no seu modelo?**
-Complexidade ciclomática e LOC, com correlação empírica documentada de
-R² ≈ 0.93 (praticamente a mesma informação estatisticamente).
+**Por que as features foram geradas independentes, se a literatura diz que
+complexidade e LOC se correlacionam no mundo real?**
+Decisão deliberada de simulação: testar o Naive Bayes no cenário em que sua
+própria suposição central é verdadeira, isolando o comportamento teórico do
+algoritmo sem misturar com o efeito de uma violação plantada. Isso é
+declarado explicitamente como limitação de realismo da simulação, não
+escondido — ver Reflexão Crítica da Etapa 4.
 
 **O modelo tem alguma feature fraca?**
 Sim — cobertura de testes tem evidência contestada na literatura quanto à sua
-relação com defeitos; declarado como limitação assumida, não ignorada.
+relação com defeitos (Inozemtseva & Holmes, 2014; Gren & Antinyan, 2017);
+declarado como limitação assumida, não ignorada.
+
+**Se não há violação de independência nos dados, qual é a "crítica" da Etapa 4?**
+A crítica muda de "o modelo erra porque os dados violam a suposição" para
+"testamos o modelo no cenário ideal onde a suposição é verdadeira; ele se
+comporta como a teoria prevê, mas isso não reflete um cenário real de
+implantação, onde essa independência não existiria de fato". A limitação
+discutida é sobre o **realismo da simulação**, não sobre um erro do modelo.
 
 ## Observação final
 Manter todo conteúdo gerado dentro do que o autor consegue explicar oralmente.
