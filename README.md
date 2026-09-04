@@ -23,77 +23,117 @@ apresentar um defeito reportado (`SIM` / `NÃO`).
 A saída é um sinal de priorização — não um veredito. Um arquivo classificado
 como `SIM` entra na frente da fila de revisão.
 
-## Features
-
-| Feature | Coleta (em um cenário real) | Faixas |
-|---|---|---|
-| Complexidade ciclomática | `radon cc` | baixa ≤10 · média 11–20 · alta >20 |
-| Linhas de código (LOC) | `radon raw` | curto <50 · médio 50–200 · longo >200 |
-| Nº de autores distintos | `git log` / PyDriller | 1 · 2–3 · ≥4 |
-| Churn relativo (90 dias) | PyDriller | <10% · 10–30% · >30% |
-| Nº de imports/dependências | módulo `ast` (stdlib) | 0–3 · 4–8 · >8 |
-| Cobertura de testes | Coverage.py | <50% · 50–80% · >80% |
-
-Cada feature tem fundamentação em literatura de engenharia de software
-empírica — ver [`relatorios/etapa1_modelagem.pdf`](relatorios/etapa1_modelagem.pdf)
-para a justificativa completa e as referências.
-
-## Estrutura do repositório
+## O pipeline, em 4 etapas
 
 ```
-.
-├── CLAUDE.md                          # contexto do projeto para agentes de IA
-├── relatorios/
-│   ├── etapa1_modelagem.pdf           # domínio, features, discretização
-│   ├── etapa2_dados.pdf               # metodologia da massa de dados sintética
-│   ├── etapa3_classificador.pdf       # arquitetura do SQL
-│   └── etapa4_resultados.pdf          # casos de teste, log-odds, reflexão crítica
-├── dados/
-│   ├── gerar_dados.py                 # gera a massa sintética de treinamento
-│   ├── etapa2_dados_treinamento.csv   # 150 registros
-│   └── etapa2_validacao.txt           # matriz de correlação, checagem dos padrões
-├── sql/
-│   ├── classificador_naive_bayes.sql  # priors, verossimilhanças, classificação
-│   └── rodar_classificador.py         # importa o CSV, roda o SQL, smoke test
-└── testes/
-    ├── casos_teste.csv                # 6 perfis de teste
-    ├── rodar_casos_teste.py           # roda os casos e calcula log-odds
-    └── resultados_casos.txt
+Etapa 1                Etapa 2                 Etapa 3                  Etapa 4
+Modelagem       ──▶     Dados            ──▶    Classificador     ──▶   Resultados
+domínio, rótulo,        gera 150 módulos        views SQL: priors,      6 casos de teste,
+6 features,              sintéticos,             verossimilhanças        log-odds por
+discretização            independentes            (Laplace), score        feature, reflexão
+                         entre si                 em log, classificação   crítica
+     │                        │                          │                     │
+     ▼                        ▼                          ▼                     ▼
+etapa1_modelagem.pdf   gerar_dados.py            classificador_...sql   rodar_casos_teste.py
+                        → *.csv / *.txt           rodar_classificador.py  → resultados_casos.txt
 ```
 
-## Como executar
+Cada seta é um artefato executável; rodando os 3 scripts em sequência (ver
+[Como executar](#como-executar)) o pipeline completo é reconstruído do zero.
 
-Requer apenas Python 3 (`sqlite3` já vem na biblioteca padrão — nenhuma
-dependência externa é necessária para os artefatos principais).
+---
 
-```bash
-# 1. Gerar a massa de dados sintética de treinamento (150 registros)
-python3 dados/gerar_dados.py
+## Etapa 1 — Modelagem do problema
 
-# 2. Construir o classificador e rodar o smoke test
-python3 sql/rodar_classificador.py
+**Rótulo alvo:** o arquivo apresentará um defeito reportado na janela de
+observação? `SIM` (propenso) / `NÃO` (não propenso) — variável binária que o
+Naive Bayes estima como `P(SIM | features)`.
 
-# 3. Rodar os 6 casos de teste formais e calcular os log-odds
-python3 testes/rodar_casos_teste.py
-```
+**Unidade de análise:** arquivo de código-fonte (não classe, como no estudo de
+referência de Koru et al.) — simplificação declarada, já que nenhuma das 6
+features depende do conceito de classe.
 
-Os três scripts são idempotentes — podem ser executados quantas vezes for
-preciso, sempre com o mesmo resultado (semente fixa `SEED = 42`).
+**As 6 features:**
 
-## Como o classificador funciona, em uma frase
+| # | Feature | Coleta (em um cenário real) | Faixas (`baixo` · `medio` · `alto`) |
+|---|---|---|---|
+| 1 | Complexidade ciclomática | `radon cc` | ≤10 · 11–20 · >20 |
+| 2 | Linhas de código (LOC) | `radon raw` | <50 · 50–200 · >200 |
+| 3 | Nº de autores distintos | `git log` / PyDriller | 1 · 2–3 · ≥4 |
+| 4 | Churn relativo (90 dias) | PyDriller | <10% · 10–30% · >30% |
+| 5 | Nº de imports/dependências | módulo `ast` (stdlib) | 0–3 · 4–8 · >8 |
+| 6 | Cobertura de testes | Coverage.py | <50% · 50–80% · >80% |
 
-Para cada classe, soma-se o logaritmo da probabilidade a priori com o
-logaritmo da verossimilhança (com suavização de Laplace) de cada uma das 6
-features observadas — evitando o *underflow* numérico de multiplicar
-probabilidades pequenas diretamente — e depois normaliza-se o resultado de
-volta para uma probabilidade entre 0% e 100%. Detalhes de cada view SQL estão
-em [`relatorios/etapa3_classificador.pdf`](relatorios/etapa3_classificador.pdf).
+Cada feature tem fundamentação própria em literatura de engenharia de software
+empírica (McCabe, Shepperd, Koru et al., Nagappan & Ball, Matsumoto et al.,
+Inozemtseva & Holmes...) — ver
+[`relatorios/etapa1_modelagem.pdf`](relatorios/etapa1_modelagem.pdf) para a
+justificativa completa, a lógica de discretização e as referências em ABNT.
 
-## Resultados
+---
 
-Massa de treino gerada com as 6 features **independentes entre si** (decisão
-de projeto "Naive Bayes puro" — ver `CLAUDE.md`); só o rótulo depende das
-features.
+## Etapa 2 — Massa de dados sintética
+
+`dados/gerar_dados.py` gera **150 módulos** sintéticos (mínimo exigido: 100).
+Decisão de projeto — **"Naive Bayes puro"** (ver `CLAUDE.md`): as 6 features
+são sorteadas de forma **independente entre si** (cada uma com seu próprio
+gerador de números aleatórios, via `rng.spawn()`); só o **rótulo** depende das
+6 features, o que é esperado — é literalmente o que o Naive Bayes modela.
+
+Isso testa o classificador no cenário em que sua própria suposição central
+(independência condicional) é verdadeira **por construção**, isolando o
+comportamento teórico do algoritmo — não é uma afirmação de que features como
+complexidade e LOC seriam de fato independentes em código real (não são; ver
+[Limitações](#limitações-conhecidas)).
+
+**Matriz de correlação de Pearson resultante** (`dados/etapa2_validacao.txt`)
+— todos os pares saem com \|r\| < 0,10, confirmando a independência:
+
+| | Complex. | LOC | Autores | Churn | Imports | Cobert. |
+|---|---|---|---|---|---|---|
+| **Complex.** | 1,00 | 0,01 | 0,00 | 0,07 | 0,08 | 0,00 |
+| **LOC** | 0,01 | 1,00 | −0,04 | −0,06 | 0,04 | 0,06 |
+| **Autores** | 0,00 | −0,04 | 1,00 | −0,07 | −0,09 | −0,04 |
+| **Churn** | 0,07 | −0,06 | −0,07 | 1,00 | −0,01 | 0,01 |
+| **Imports** | 0,08 | 0,04 | −0,09 | −0,01 | 1,00 | −0,04 |
+| **Cobert.** | 0,00 | 0,06 | −0,04 | 0,01 | −0,04 | 1,00 |
+
+Proporção de classes: **34,7 % SIM / 65,3 % NÃO** (~1:2, moderadamente
+desbalanceado de propósito). Detalhes do modelo generativo, estatísticas
+descritivas e a checagem de que a taxa de defeito ainda é monotônica por
+feature isolada em
+[`relatorios/etapa2_dados.pdf`](relatorios/etapa2_dados.pdf).
+
+---
+
+## Etapa 3 — Classificador Naive Bayes em SQL
+
+`sql/classificador_naive_bayes.sql` implementa o classificador como uma
+cadeia de `VIEW`s em SQLite:
+
+`priors` (P(classe)) → `treino_longo` (unpivot das 6 categorias) →
+`verossimilhancas` (P(categoria\|classe) com suavização de Laplace) →
+`score_log` (soma de log-probabilidades) → `classificar_modulo`
+(normalização de volta para % + recomendação).
+
+**Em uma frase:** para cada classe, soma-se o logaritmo do prior com o
+logaritmo da verossimilhança (Laplace) de cada uma das 6 features — evitando
+o *underflow* de multiplicar probabilidades pequenas diretamente — e
+normaliza-se o resultado de volta para uma probabilidade entre 0% e 100%.
+
+`sql/rodar_classificador.py` (re)constrói `dados/classificador.db`, importa o
+CSV da Etapa 2 e roda um *smoke test* com 2 casos de exemplo. Priors:
+**P(NÃO) = 98/150 = 0,653** · **P(SIM) = 52/150 = 0,347**. Arquitetura
+completa, view a view, em
+[`relatorios/etapa3_classificador.pdf`](relatorios/etapa3_classificador.pdf).
+
+---
+
+## Etapa 4 — Resultados dos testes e reflexão crítica
+
+`testes/rodar_casos_teste.py` classifica **6 casos formais**
+(`testes/casos_teste.csv`) e calcula o log-odds de cada categoria de cada
+feature a partir da view `verossimilhancas`.
 
 | Caso | Perfil | P(SIM) | Recomendação |
 |---|---|---|---|
@@ -108,14 +148,24 @@ features.
 nº de autores (0,695) > complexidade ciclomática (0,595) > churn relativo
 (0,482) > LOC (0,285) > cobertura de testes (0,227) > nº de imports (0,180).
 
-Análise completa dos 6 casos, decomposição em log-odds e reflexão crítica em
+**Achado central — caso d.** Sem nenhum bônus de interação plantado nos
+dados (Etapa 2), o resultado do arquivo "pequeno e denso" é exatamente a
+**soma** dos dois efeitos marginais — log-odds de LOC baixo (+0,45) mais
+log-odds de complexidade alta (+0,76) — e nada além disso. O Naive Bayes soma
+evidências marginais; ele não modela, para mais nem para menos, um efeito de
+interação entre features.
+
+Análise completa dos 6 casos, decomposição em log-odds e a Reflexão Crítica
+(Seção 5) em
 [`relatorios/etapa4_resultados.pdf`](relatorios/etapa4_resultados.pdf).
+
+---
 
 ## Limitações conhecidas
 
 - **A independência entre features testada aqui é verdadeira por construção,
   não por realismo.** Os dados sintéticos são gerados com as 6 features
-  independentes entre si — a matriz de correlação confirma |r| < 0,10 em
+  independentes entre si — a matriz de correlação confirma \|r\| < 0,10 em
   todos os pares. Isso valida a implementação do classificador no cenário
   ideal, mas não reflete um cenário real de implantação: em código real,
   complexidade ciclomática e LOC são fortemente correlacionadas (R² ≈ 0,93 —
@@ -135,6 +185,53 @@ Análise completa dos 6 casos, decomposição em log-odds e reflexão crítica e
   por categoria de cada feature (exigência da atividade).
 
 Discussão completa de cada ponto no relatório da Etapa 4.
+
+---
+
+## Como executar
+
+Requer apenas Python 3 com `numpy`, `pandas` (geração dos dados) e `sqlite3`
+(biblioteca padrão, classificador). `markdown` + `weasyprint` são necessários
+apenas para regenerar os PDFs (`relatorios/build_pdf.py`), não para rodar o
+classificador.
+
+```bash
+# 1. Gerar a massa de dados sintética de treinamento (150 registros)
+python3 dados/gerar_dados.py
+
+# 2. Construir o classificador e rodar o smoke test
+python3 sql/rodar_classificador.py
+
+# 3. Rodar os 6 casos de teste formais e calcular os log-odds
+python3 testes/rodar_casos_teste.py
+```
+
+Os três scripts são idempotentes — podem ser executados quantas vezes for
+preciso, sempre com o mesmo resultado (semente fixa `SEED = 42`).
+
+## Estrutura do repositório
+
+```
+.
+├── CLAUDE.md                          # contexto do projeto para agentes de IA
+├── relatorios/                        # Etapa 1–4: .md fonte + .pdf de cada relatório
+│   ├── etapa1_modelagem.{md,pdf}      # domínio, rótulo, features, discretização
+│   ├── etapa2_dados.{md,pdf}          # metodologia da massa de dados sintética
+│   ├── etapa3_classificador.{md,pdf}  # arquitetura do SQL
+│   ├── etapa4_resultados.{md,pdf}     # casos de teste, log-odds, reflexão crítica
+│   └── build_pdf.py                   # .md -> HTML com estilo -> PDF (WeasyPrint)
+├── dados/                              # Etapa 2
+│   ├── gerar_dados.py                 # gera a massa sintética de treinamento
+│   ├── etapa2_dados_treinamento.csv   # 150 registros
+│   └── etapa2_validacao.txt           # matriz de correlação, estatísticas
+├── sql/                                # Etapa 3
+│   ├── classificador_naive_bayes.sql  # priors, verossimilhanças, classificação
+│   └── rodar_classificador.py         # importa o CSV, roda o SQL, smoke test
+└── testes/                             # Etapa 4
+    ├── casos_teste.csv                # 6 perfis de teste
+    ├── rodar_casos_teste.py           # roda os casos e calcula log-odds
+    └── resultados_casos.txt
+```
 
 ## Referências principais
 
@@ -157,4 +254,3 @@ alegação teórica trazida pela IA foi verificada contra a literatura original
 antes de ser incorporada — o processo de checagem está documentado no
 relatório da Etapa 1 (Apêndice B). Todo o conteúdo é defensável oralmente,
 linha a linha, pelo autor.
-
