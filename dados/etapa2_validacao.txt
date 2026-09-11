@@ -56,11 +56,11 @@ cobertura_testes           62.80   18.50  2.0    63.0    99.0
     cobertura_testes_cat  : baixo=245500  medio=569728  alto=184772
 
 (f) DESEMPENHO DA GERAÇÃO
-    Geração das 6 features (numpy, vetorizado) .:  1.957 s
-    Geração do rótulo (score + top-k) ..........:  0.515 s
-    Escrita do CSV (df.to_csv) .................:  5.447 s
-    Validação (correlação, describe, groupby) ..:  3.301 s
-    TOTAL (gerar_dados.py, ponta a ponta) ......: 11.637 s
-    Throughput ..................................: 85.932 registros/s
+    Geração das 6 features (numpy, vetorizado) .:  1.411 s
+    Geração do rótulo (score + top-k) ..........:  0.494 s
+    Escrita do CSV (df.to_csv) .................:  4.094 s
+    Validação (correlação, describe, groupby) ..:  2.728 s
+    TOTAL (gerar_dados.py, ponta a ponta) ......:  9.070 s
+    Throughput ..................................: 110.256 registros/s
 
 ======================================================================
