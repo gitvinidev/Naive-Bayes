@@ -9,7 +9,7 @@ domínio real de engenharia de software.
 |---|---|
 | **Autor** | Marcus Viníicius Santos de Almeida |
 | **Disciplina** | Mineração de Dados |
-| **Entrega** | 04/09/2026 |
+| **Entrega** | 11/09/2026 |
 | **Banco de dados** | DuckDB (sem servidor, motor analítico/colunar) |
 
 > ⚠️ **A massa de dados completa (1.000.000 de linhas) não vem no
@@ -167,10 +167,10 @@ evidências marginais; ele não modela, para mais nem para menos, um efeito de
 interação entre features.
 
 **Desempenho (§6 do relatório).** Os scripts imprimem e salvam o próprio
-tempo de execução. Com N = 1.000.000: geração dos dados (Etapa 2) ≈11,9 s,
-importação do CSV para o DuckDB (Etapa 3) ≈3,3 s, e classificar os 6 casos de
+tempo de execução. Com N = 1.000.000: geração dos dados (Etapa 2) ≈9,1 s,
+importação do CSV para o DuckDB (Etapa 3) ≈2,5 s, e classificar os 6 casos de
 teste ponta a ponta — conectar ao banco, importar o CSV, criar as views e
-classificar (Etapa 4) — ≈4,1 s. Classificar um caso novo não fica mais lento
+classificar (Etapa 4) — ≈3,7 s. Classificar um caso novo não fica mais lento
 com N maior: a consulta usa só a tabela de verossimilhanças, de tamanho fixo
 (36 linhas), não os registros de treino. Detalhes em
 `relatorios/etapa4_resultados.pdf`.
@@ -211,8 +211,8 @@ Discussão completa de cada ponto no relatório da Etapa 4.
 ## Como executar
 
 Requer Python 3 com `numpy`, `pandas` (geração dos dados) e `duckdb`
-(classificador). `markdown` + `weasyprint` são necessários apenas para
-regenerar os PDFs (`relatorios/build_pdf.py`), não para rodar o classificador.
+(classificador). Os relatórios em `relatorios/` já estão publicados em PDF;
+não é necessário regerá-los para rodar o pipeline abaixo.
 
 ```bash
 # 0. Instalar dependências
@@ -245,11 +245,11 @@ inspecionar as tabelas e views (`priors`, `treino_longo`, `verossimilhancas`,
 .
 ├── CLAUDE.md                          # contexto do projeto para agentes de IA
 ├── requirements.txt                   # numpy, pandas, duckdb
-├── relatorios/                        # Etapa 1–4: .md fonte + .pdf de cada relatório
-│   ├── etapa1_modelagem.{md,pdf}      # domínio, rótulo, features, discretização
-│   ├── etapa2_dados.{md,pdf}          # metodologia da massa de dados sintética
-│   ├── etapa3_classificador.{md,pdf}  # arquitetura do SQL
-│   ├── etapa4_resultados.{md,pdf}     # casos de teste, log-odds, reflexão crítica
+├── relatorios/                        # Etapa 1–4: relatório final de cada etapa, em PDF
+│   ├── etapa1_modelagem.pdf           # domínio, rótulo, features, discretização
+│   ├── etapa2_dados.pdf               # metodologia da massa de dados sintética
+│   ├── etapa3_classificador.pdf       # arquitetura do SQL
+│   ├── etapa4_resultados.pdf          # casos de teste, log-odds, reflexão crítica
 │   └── build_pdf.py                   # .md -> HTML com estilo -> PDF (WeasyPrint)
 ├── dados/                              # Etapa 2
 │   ├── gerar_dados.py                 # gera a massa sintética de treinamento
