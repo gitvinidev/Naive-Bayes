@@ -18,8 +18,19 @@ NOTA sobre LN/EXP:
   DuckDB traz `ln()` e `exp()` nativos — diferente do SQLite, não é preciso
   nenhum fallback em Python (`connection.create_function`) para garantir
   essas funções; ver CLAUDE.md, "Migração para DuckDB".
+
+NOTA sobre desempenho:
+  main() mede o tempo de importação do CSV (I/O real, sem ambiguidade de
+  quando o cálculo "de fato" acontece) e imprime junto com a contagem de
+  registros importados. Não cronometra a criação das views nem a
+  classificação isoladamente — ver CLAUDE.md, "Medições de desempenho": uma
+  primeira versão fazia isso forçando a materialização de uma view antes de
+  cronometrá-la à parte, o que era uma nuance técnica a mais do que o
+  necessário para a defesa oral. O tempo de ponta a ponta para classificar
+  os 6 casos formais está em testes/rodar_casos_teste.py / Etapa 4.
 """
 
+import time
 import duckdb
 from pathlib import Path
 
@@ -128,8 +139,11 @@ def main():
     print(f"Banco : {DB_PATH}")
     con = duckdb.connect(str(DB_PATH))
     try:
+        t0 = time.perf_counter()
         n = importar_treino(con)
-        print(f"Importados {n} registros para dados_treinamento.\n")
+        t_import = time.perf_counter() - t0
+        print(f"Importados {n} registros para dados_treinamento "
+              f"({t_import:.3f} s).\n")
 
         con.execute(SQL_SCRIPT.read_text(encoding="utf-8"))
         carregar_casos(con, CASOS_EXEMPLO)

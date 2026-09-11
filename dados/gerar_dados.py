@@ -33,6 +33,7 @@ Saídas:
   dados/etapa2_validacao.txt           — proporção de classes, correlações, estatísticas
 """
 
+import time
 from pathlib import Path
 
 import numpy as np
@@ -239,8 +240,14 @@ def gerar_rotulo(df, rng_rotulo):
 # ==========================================================================
 # 7) VALIDAÇÃO
 # ==========================================================================
-def validar(df):
-    """Gera o texto de validação e devolve também os objetos usados no relatório."""
+def validar(df, tempos=None):
+    """Gera o texto de validação e devolve também os objetos usados no relatório.
+
+    `tempos`: dict opcional com medições de desempenho (ver main()) — se
+    fornecido, é impresso na seção (f) DESEMPENHO. A própria função mede seu
+    tempo de execução (correlação, describe, groupby) e acrescenta ao dict."""
+    if tempos is not None:
+        t_validar_inicio = time.perf_counter()
     L = []
     L.append("=" * 70)
     L.append("VALIDAÇÃO DA MASSA DE DADOS SINTÉTICA — ETAPA 2")
@@ -322,6 +329,30 @@ def validar(df):
         d = df[col].value_counts().reindex(["baixo", "medio", "alto"]).fillna(0).astype(int)
         L.append(f"    {col:<22}: baixo={d['baixo']:3d}  medio={d['medio']:3d}  alto={d['alto']:3d}")
     L.append("")
+
+    # --- (f) desempenho da geração (medido em main(), ver docstring) ---
+    # Interessa sobretudo por causa do aumento de N_REGISTROS: confirma que a
+    # geração vetorizada em numpy escala para 1.000.000 de linhas em segundos,
+    # não minutos (ver CLAUDE.md, "Migração para DuckDB e N = 1.000.000
+    # registros").
+    if tempos is not None:
+        tempos["validacao"] = time.perf_counter() - t_validar_inicio
+        tempos["total"] = time.perf_counter() - tempos["inicio"]
+        L.append("(f) DESEMPENHO DA GERAÇÃO")
+        L.append(f"    Geração das 6 features (numpy, vetorizado) .: "
+                 f"{tempos['features']:6.3f} s")
+        L.append(f"    Geração do rótulo (score + top-k) ..........: "
+                 f"{tempos['rotulo']:6.3f} s")
+        L.append(f"    Escrita do CSV (df.to_csv) .................: "
+                 f"{tempos['csv']:6.3f} s")
+        L.append(f"    Validação (correlação, describe, groupby) ..: "
+                 f"{tempos['validacao']:6.3f} s")
+        L.append(f"    TOTAL (gerar_dados.py, ponta a ponta) ......: "
+                 f"{tempos['total']:6.3f} s")
+        L.append(f"    Throughput ..................................: "
+                 f"{N_REGISTROS / tempos['total']:,.0f} registros/s".replace(",", "."))
+        L.append("")
+
     L.append("=" * 70)
 
     texto = "\n".join(L)
@@ -333,6 +364,7 @@ def validar(df):
 # 8) MAIN
 # ==========================================================================
 def main():
+    t_inicio = time.perf_counter()
     rng = np.random.default_rng(SEED)
 
     # Um gerador INDEPENDENTE por feature + um para o ruído do rótulo,
@@ -343,8 +375,15 @@ def main():
     filhos = rng.spawn(len(chaves))
     rngs = dict(zip(chaves, filhos))
 
+    # Medido separadamente por ser o ponto que mais importaria "explodir" com
+    # N_REGISTROS = 1.000.000 se não fosse vetorizado em numpy (ver CLAUDE.md).
+    t0 = time.perf_counter()
     df = gerar_features(rngs)
+    t_features = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
     df = gerar_rotulo(df, rngs["rotulo"])
+    t_rotulo = time.perf_counter() - t0
 
     # coluna de ID de módulo + ordenação final das colunas
     df.insert(0, "modulo_id",
@@ -359,9 +398,13 @@ def main():
              "defeito"]
     df = df[ordem]
 
+    t0 = time.perf_counter()
     df.to_csv(CSV_OUT, index=False, encoding="utf-8")
+    t_csv = time.perf_counter() - t0
 
-    texto, _ = validar(df)
+    tempos = {"features": t_features, "rotulo": t_rotulo, "csv": t_csv,
+              "inicio": t_inicio}
+    texto, _ = validar(df, tempos)
     VALID_OUT.write_text(texto + "\n", encoding="utf-8")
 
     print(texto)

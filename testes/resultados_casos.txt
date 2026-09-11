@@ -91,4 +91,16 @@ RANKING DAS FEATURES POR PODER DISCRIMINATIVO ( |log-odds| medio )
   5  loc                         0.2067          0.3619
   6  cobertura                    0.157          0.2234
 
+------------------------------------------------------------------------
+DESEMPENHO
+------------------------------------------------------------------------
+  Tempo total, de ponta a ponta (conectar ao banco, importar
+  o CSV de treino, criar as views e classificar os 6 casos
+  de teste) ..........................................:  4.018 s
+
+  Classificar um caso novo não fica mais lento com N maior:
+  a consulta usa só a tabela de verossimilhanças, de tamanho
+  FIXO (6 features x 3 categorias x 2 classes = 36 linhas) —
+  não depende de escanear as N linhas de dados_treinamento.
+
 ========================================================================

@@ -166,6 +166,15 @@ log-odds de complexidade alta (+0,98) — e nada além disso. O Naive Bayes soma
 evidências marginais; ele não modela, para mais nem para menos, um efeito de
 interação entre features.
 
+**Desempenho (§6 do relatório).** Os scripts imprimem e salvam o próprio
+tempo de execução. Com N = 1.000.000: geração dos dados (Etapa 2) ≈11,9 s,
+importação do CSV para o DuckDB (Etapa 3) ≈3,3 s, e classificar os 6 casos de
+teste ponta a ponta — conectar ao banco, importar o CSV, criar as views e
+classificar (Etapa 4) — ≈4,1 s. Classificar um caso novo não fica mais lento
+com N maior: a consulta usa só a tabela de verossimilhanças, de tamanho fixo
+(36 linhas), não os registros de treino. Detalhes em
+`relatorios/etapa4_resultados.pdf`.
+
 Análise completa dos 6 casos, decomposição em log-odds e a Reflexão Crítica
 (Seção 5) em
 [`relatorios/etapa4_resultados.pdf`](relatorios/etapa4_resultados.pdf).

@@ -14,9 +14,18 @@ produz a evidência para o relatório:
   5. imprime tudo e grava em testes/resultados_casos.txt.
 
 Não contém análise escrita — essa está em relatorios/etapa4_resultados.md.
+
+Também mede um único tempo de parede (wall-clock), do início do script até
+obter os resultados finais dos 6 casos de teste — número usado na seção
+"Desempenho" do relatório da Etapa 4. Ver CLAUDE.md, "Medições de
+desempenho": essa medição é deliberadamente simples (uma cronometragem só,
+sem cronômetros segmentados nem truques de materialização de view) porque o
+script já precisa dos resultados de verdade para funcionar — a computação das
+views acontece naturalmente dentro dessa janela.
 """
 
 import csv
+import time
 import duckdb
 import sys
 from pathlib import Path
@@ -126,7 +135,7 @@ def log_odds(con):
     return detalhe, ranking
 
 
-def formatar(casos_result, detalhe, ranking):
+def formatar(casos_result, detalhe, ranking, t_total=None):
     L = []
     L.append("=" * 72)
     L.append("ETAPA 4 — RESULTADOS DOS 6 CASOS DE TESTE + RANKING DE LOG-ODDS")
@@ -165,22 +174,49 @@ def formatar(casos_result, detalhe, ranking):
     for i, (feat, med, mx) in enumerate(ranking, 1):
         L.append(f"  {i:<3}{feat:<16}{med:>18}{mx:>16}")
     L.append("")
+
+    if t_total is not None:
+        L.append("-" * 72)
+        L.append("DESEMPENHO")
+        L.append("-" * 72)
+        L.append("  Tempo total, de ponta a ponta (conectar ao banco, importar")
+        L.append("  o CSV de treino, criar as views e classificar os 6 casos")
+        L.append(f"  de teste) ..........................................: "
+                  f"{t_total:6.3f} s")
+        L.append("")
+        L.append("  Classificar um caso novo não fica mais lento com N maior:")
+        L.append("  a consulta usa só a tabela de verossimilhanças, de tamanho")
+        L.append("  FIXO (6 features x 3 categorias x 2 classes = 36 linhas) —")
+        L.append("  não depende de escanear as N linhas de dados_treinamento.")
+        L.append("")
     L.append("=" * 72)
     return "\n".join(L)
 
 
 def main():
+    # Único cronômetro: início do script (antes de conectar ao banco) até
+    # obter os resultados finais dos 6 casos de teste. Sem cronometragem
+    # segmentada nem truque de materialização de view — o script precisa dos
+    # resultados de verdade para funcionar, então o custo de criar/consultar
+    # as views já acontece naturalmente dentro dessa janela (ver CLAUDE.md,
+    # "Medições de desempenho").
+    t_inicio = time.perf_counter()
     con = duckdb.connect(str(DB_PATH))
     try:
         n = importar_treino(con)
         con.execute(SQL_SCRIPT.read_text(encoding="utf-8"))
         casos = carregar_casos_csv(con)
         casos_result = classificar(con, casos)
+        t_total = time.perf_counter() - t_inicio
+
+        # Cálculo do ranking de log-odds: análise extra para o relatório, não
+        # faz parte de "classificar os 6 casos de teste" — fica de fora do
+        # tempo medido acima.
         detalhe, ranking = log_odds(con)
     finally:
         con.close()
 
-    texto = formatar(casos_result, detalhe, ranking)
+    texto = formatar(casos_result, detalhe, ranking, t_total)
     SAIDA_TXT.write_text(texto + "\n", encoding="utf-8")
     print(f"(base reconstruida com {n} registros de treino)\n")
     print(texto)

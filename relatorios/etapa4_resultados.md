@@ -421,6 +421,45 @@ relativa dos módulos — que o classificador produz.
 
 ---
 
+## 6. Desempenho
+
+Com N passando de 150 para 1.000.000 de registros (Etapa 2, ver CLAUDE.md),
+faz sentido medir — não só assumir — que o pipeline continua rodando em
+segundos, não minutos. Os números abaixo vêm direto dos scripts, que
+instrumentam e imprimem seu próprio tempo de execução (`time.perf_counter`):
+`dados/gerar_dados.py` mede a geração dos dados; `sql/rodar_classificador.py`
+mede a importação do CSV; `testes/rodar_casos_teste.py` mede um único tempo
+de parede (wall-clock), do início do script até obter os resultados dos 6
+casos de teste (essa medição é salva na seção "DESEMPENHO" de
+`testes/resultados_casos.txt`, gerada a cada execução).
+
+| Etapa | O que mede | Tempo |
+|---|---|---|
+| Etapa 2 — geração dos dados | 1.000.000 de módulos sintéticos (numpy vetorizado + pandas), ponta a ponta | **11,88 s** |
+| Etapa 3 — importação do CSV | `read_csv_auto` → tabela `dados_treinamento` (1.000.000 de linhas) | **3,33 s** |
+| Etapa 4 — classificar os 6 casos, ponta a ponta | Conectar ao banco, importar o CSV de treino, criar as views e classificar os 6 casos de teste | **4,12 s** |
+
+Detalhamento interno da Etapa 2 (geração de features / geração do rótulo /
+escrita do CSV / cálculo das estatísticas de validação) fica em
+`dados/etapa2_validacao.txt` §(f).
+
+**Leitura dos números.** O pipeline inteiro continua na casa dos segundos, não
+minutos — a checagem pedida no CLAUDE.md ao aumentar `N_REGISTROS` passa com
+folga. A etapa mais lenta é a geração dos dados (Etapa 2); as Etapas 3 e 4
+recriam o banco DuckDB do zero (importação do CSV + criação das views +
+classificação) em poucos segundos, mesmo com `treino_longo` chegando a
+6.000.000 de linhas.
+
+**Classificar um caso novo não fica mais lento com N maior.** A consulta que
+classifica um perfil de 6 categorias usa só a view `verossimilhancas`, de
+tamanho **fixo** — 6 features × 3 categorias × 2 classes = 36 linhas — não
+importa se o treino tem 150 ou 1.000.000 de módulos. O Naive Bayes usa apenas
+essas 36 fatias unidimensionais de `P(categoria | classe)` (§4.3), nunca uma
+busca sobre `dados_treinamento` inteiro; por isso o custo de classificar um
+caso não escala com N.
+
+---
+
 ### Nota sobre o uso de IA
 
 Os casos de teste, o script de execução e esta análise foram construídos em

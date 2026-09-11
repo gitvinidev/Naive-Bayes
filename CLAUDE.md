@@ -213,6 +213,43 @@ projeto/
 └── testes/
 ```
 
+## Medições de desempenho (adicionado a pedido do autor)
+
+A pedido do autor ("incorpore testes de desempenho do modelo como o tempo de
+treinamento, geração de dados e o que for interessante medir, e coloque nos
+resultados"), o pipeline passou a medir tempos de execução. Uma primeira
+implementação foi mais elaborada do que o necessário (função dedicada para
+forçar a materialização de uma view antes de cronometrá-la isoladamente, e um
+benchmark separado comparando geração vetorizada vs. laço linha a linha). A
+decisão foi **simplificar**, para não carregar mais uma nuance técnica do que
+o necessário para a defesa oral.
+
+**Medições mantidas:**
+- Tempo de geração dos dados sintéticos (`dados/gerar_dados.py`) — geração
+  das 6 features + rótulo + escrita do CSV.
+- Tempo de importação do CSV para dentro do DuckDB (`read_csv_auto`, em
+  `sql/rodar_classificador.py`) — é I/O real, sem ambiguidade de quando o
+  cálculo "de fato" acontece.
+- Tempo total, de ponta a ponta, para classificar os 6 casos de teste
+  (`testes/rodar_casos_teste.py`) — uma única medição de parede (wall-clock),
+  do início do script até obter os resultados finais dos 6 casos. Como o
+  script precisa dos resultados de verdade (não só criar a view), a
+  computação acontece naturalmente dentro dessa janela — sem precisar de
+  nenhum truque de materialização isolado nem de explicar o conceito de view
+  "preguiçosa" (lazy) à parte.
+
+**Removido, por decisão do autor:** a função que forçava materialização de
+uma view antes de medir seu tempo isoladamente (`treinar()` ou equivalente),
+o cronômetro que dependia dela, e o benchmark separado comparando geração
+linha-a-linha vs. vetorizada — interessante, mas fora do escopo de
+"resultados", e uma nuance técnica a mais para defender sem necessidade.
+
+**Observação que continua válida e vale citar na apresentação:** classificar
+um caso novo não fica mais lento com N maior — depende só do tamanho fixo da
+tabela de verossimilhanças (6 features × 3 categorias × 2 classes = 36
+linhas), não do número de registros de treino. Essa observação é simples de
+defender e não depende de nenhuma explicação de materialização de view.
+
 ## Perguntas de defesa (referência rápida para a apresentação)
 
 **Por que arquivo e não classe como módulo?**
