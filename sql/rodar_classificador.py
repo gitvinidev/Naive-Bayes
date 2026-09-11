@@ -1,56 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Etapa 3 — Runner do classificador Naive Bayes em SQL (SQLite).
+Etapa 3 — Runner do classificador Naive Bayes em SQL (DuckDB).
 
 O que este script faz, em ordem:
   1. (Re)cria o banco dados/classificador.db e importa
-     dados/etapa2_dados_treinamento.csv para a tabela `dados_treinamento`.
-  2. Garante que as funções LN e EXP existem no SQLite (registra
-     equivalentes em Python se o build não as tiver — ver nota abaixo).
-  3. Executa sql/classificador_naive_bayes.sql (cria as views do modelo).
-  4. Insere 1–2 CASOS DE EXEMPLO MÍNIMOS em `caso_teste` — apenas um
+     dados/etapa2_dados_treinamento.csv para a tabela `dados_treinamento`
+     (nativamente, via `read_csv_auto`).
+  2. Executa sql/classificador_naive_bayes.sql (cria as views do modelo).
+  3. Insere 1–2 CASOS DE EXEMPLO MÍNIMOS em `caso_teste` — apenas um
      smoke test para provar que o SQL roda de ponta a ponta. Os 5+ casos
      formais e a análise crítica são da Etapa 4, não deste script.
-  5. Consulta a view `classificar_modulo` e imprime o resultado legível.
-  6. Valida: as duas probabilidades somam ~100% e as 6 features casaram.
+  4. Consulta a view `classificar_modulo` e imprime o resultado legível.
+  5. Valida: as duas probabilidades somam ~100% e as 6 features casaram.
 
 NOTA sobre LN/EXP:
-  O SQLite >= 3.35 tem ln()/exp() nativas quando compilado com
-  SQLITE_ENABLE_MATH_FUNCTIONS. O módulo sqlite3 do CPython usado aqui
-  (SQLite 3.45.1) já as traz. Mesmo assim, por portabilidade, testamos
-  `SELECT ln(1)` e, se falhar, registramos `ln` e `exp` via
-  connection.create_function(..., math.log / math.exp). Assim o mesmo
-  SQL roda em qualquer build.
+  DuckDB traz `ln()` e `exp()` nativos — diferente do SQLite, não é preciso
+  nenhum fallback em Python (`connection.create_function`) para garantir
+  essas funções; ver CLAUDE.md, "Migração para DuckDB".
 """
 
-import csv
-import math
-import sqlite3
+import duckdb
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 CSV_TREINO = RAIZ / "dados" / "etapa2_dados_treinamento.csv"
 DB_PATH = RAIZ / "dados" / "classificador.db"
 SQL_SCRIPT = RAIZ / "sql" / "classificador_naive_bayes.sql"
-
-# Esquema da tabela de treino (nomes = cabeçalho do CSV da Etapa 2)
-COLUNAS_TREINO = [
-    ("modulo_id", "TEXT"),
-    ("complexidade_ciclomatica", "INTEGER"),
-    ("complexidade_cat", "TEXT"),
-    ("loc", "INTEGER"),
-    ("loc_cat", "TEXT"),
-    ("n_autores", "INTEGER"),
-    ("n_autores_cat", "TEXT"),
-    ("churn_relativo", "REAL"),
-    ("churn_relativo_cat", "TEXT"),
-    ("n_imports", "INTEGER"),
-    ("n_imports_cat", "TEXT"),
-    ("cobertura_testes", "REAL"),
-    ("cobertura_testes_cat", "TEXT"),
-    ("defeito", "TEXT"),
-]
 
 # As 6 chaves de feature usadas pelo SQL (iguais às de treino_longo)
 FEATURES = ["complexidade", "loc", "n_autores", "churn", "n_imports", "cobertura"]
@@ -80,37 +56,14 @@ CASOS_EXEMPLO = {
 }
 
 
-def garantir_math(con):
-    """Testa ln()/exp(); registra fallback Python se o build não tiver."""
-    try:
-        con.execute("SELECT ln(1.0), exp(0.0)").fetchone()
-        return "nativas do SQLite"
-    except sqlite3.OperationalError:
-        con.create_function("ln", 1, math.log, deterministic=True)
-        con.create_function("exp", 1, math.exp, deterministic=True)
-        return "registradas em Python (math.log / math.exp)"
-
-
 def importar_treino(con):
-    """(Re)cria dados_treinamento e carrega o CSV da Etapa 2."""
-    cols_ddl = ",\n    ".join(f"{nome} {tipo}" for nome, tipo in COLUNAS_TREINO)
-    con.execute("DROP TABLE IF EXISTS dados_treinamento;")
-    con.execute(f"CREATE TABLE dados_treinamento (\n    {cols_ddl}\n);")
-
-    nomes = [nome for nome, _ in COLUNAS_TREINO]
-    placeholders = ",".join("?" for _ in nomes)
-    with open(CSV_TREINO, newline="", encoding="utf-8") as fh:
-        leitor = csv.DictReader(fh)
-        faltando = set(nomes) - set(leitor.fieldnames or [])
-        if faltando:
-            raise SystemExit(f"CSV sem colunas esperadas: {sorted(faltando)}")
-        linhas = [tuple(row[n] for n in nomes) for row in leitor]
-    con.executemany(
-        f"INSERT INTO dados_treinamento ({','.join(nomes)}) VALUES ({placeholders})",
-        linhas,
-    )
-    con.commit()
-    return len(linhas)
+    """(Re)cria dados_treinamento a partir do CSV da Etapa 2, via leitura
+    nativa do DuckDB — sem laço de INSERT manual."""
+    con.execute(f"""
+        CREATE OR REPLACE TABLE dados_treinamento AS
+        SELECT * FROM read_csv_auto('{CSV_TREINO.as_posix()}');
+    """)
+    return con.execute("SELECT COUNT(*) FROM dados_treinamento").fetchone()[0]
 
 
 def carregar_casos(con, casos):
@@ -124,15 +77,14 @@ def carregar_casos(con, casos):
         "INSERT INTO caso_teste (caso_id, feature, categoria) VALUES (?, ?, ?)",
         linhas,
     )
-    con.commit()
 
 
 def imprimir_priors(con):
     print("PRIORS  P(classe)  (contagem simples em dados_treinamento)")
     for classe, n, total, p in con.execute(
         "SELECT classe, n_classe, n_total, p_prior FROM priors ORDER BY classe"
-    ):
-        print(f"   P({classe}) = {n:>3}/{total} = {p:.4f}")
+    ).fetchall():
+        print(f"   P({classe}) = {n:>7}/{total} = {p:.4f}")
     print()
 
 
@@ -174,15 +126,12 @@ def classificar_e_imprimir(con, casos):
 
 def main():
     print(f"Banco : {DB_PATH}")
-    con = sqlite3.connect(DB_PATH)
+    con = duckdb.connect(str(DB_PATH))
     try:
-        origem_math = garantir_math(con)
-        print(f"LN/EXP: {origem_math}\n")
-
         n = importar_treino(con)
         print(f"Importados {n} registros para dados_treinamento.\n")
 
-        con.executescript(SQL_SCRIPT.read_text(encoding="utf-8"))
+        con.execute(SQL_SCRIPT.read_text(encoding="utf-8"))
         carregar_casos(con, CASOS_EXEMPLO)
 
         imprimir_priors(con)

@@ -10,7 +10,12 @@ domínio real de engenharia de software.
 | **Autor** | Marcus Viníicius Santos de Almeida |
 | **Disciplina** | Mineração de Dados |
 | **Entrega** | 04/09/2026 |
-| **Banco de dados** | SQLite (sem dependências externas) |
+| **Banco de dados** | DuckDB (sem servidor, motor analítico/colunar) |
+
+> ⚠️ **A massa de dados completa (1.000.000 de linhas) não vem no
+> repositório.** `dados/etapa2_dados_treinamento.csv` é grande e 100%
+> reproduzível via semente fixa, então está no `.gitignore` — rode
+> `python3 dados/gerar_dados.py` primeiro (ver [Como executar](#como-executar)).
 
 ## O problema
 
@@ -28,10 +33,11 @@ como `SIM` entra na frente da fila de revisão.
 ```
 Etapa 1                Etapa 2                 Etapa 3                  Etapa 4
 Modelagem       ──▶     Dados            ──▶    Classificador     ──▶   Resultados
-domínio, rótulo,        gera 150 módulos        views SQL: priors,      6 casos de teste,
-6 features,              sintéticos,             verossimilhanças        log-odds por
-discretização            independentes            (Laplace), score        feature, reflexão
-                         entre si                 em log, classificação   crítica
+domínio, rótulo,        gera 1.000.000          views SQL: priors,      6 casos de teste,
+6 features,              de módulos              verossimilhanças        log-odds por
+discretização            sintéticos,              (Laplace), score        feature, reflexão
+                         independentes            em log, classificação   crítica
+                         entre si
      │                        │                          │                     │
      ▼                        ▼                          ▼                     ▼
 etapa1_modelagem.pdf   gerar_dados.py            classificador_...sql   rodar_casos_teste.py
@@ -74,11 +80,13 @@ justificativa completa, a lógica de discretização e as referências em ABNT.
 
 ## Etapa 2 — Massa de dados sintética
 
-`dados/gerar_dados.py` gera **150 módulos** sintéticos (mínimo exigido: 100).
-Decisão de projeto — **"Naive Bayes puro"** (ver `CLAUDE.md`): as 6 features
-são sorteadas de forma **independente entre si** (cada uma com seu próprio
-gerador de números aleatórios, via `rng.spawn()`); só o **rótulo** depende das
-6 features, o que é esperado — é literalmente o que o Naive Bayes modela.
+`dados/gerar_dados.py` gera **1.000.000 de módulos** sintéticos (mínimo
+exigido: 100), com toda a geração vetorizada em numpy — roda em poucos
+segundos. Decisão de projeto — **"Naive Bayes puro"** (ver `CLAUDE.md`): as 6
+features são sorteadas de forma **independente entre si** (cada uma com seu
+próprio gerador de números aleatórios, via `rng.spawn()`); só o **rótulo**
+depende das 6 features, o que é esperado — é literalmente o que o Naive Bayes
+modela.
 
 Isso testa o classificador no cenário em que sua própria suposição central
 (independência condicional) é verdadeira **por construção**, isolando o
@@ -87,18 +95,20 @@ complexidade e LOC seriam de fato independentes em código real (não são; ver
 [Limitações](#limitações-conhecidas)).
 
 **Matriz de correlação de Pearson resultante** (`dados/etapa2_validacao.txt`)
-— todos os pares saem com \|r\| < 0,10, confirmando a independência:
+— com N = 1.000.000, todos os pares saem com \|r\| ≤ 0,002 (erro-padrão
+esperado ≈ 1/√(N−2) ≈ 0,001 nesta escala), confirmando a independência com
+folga ainda maior do que na versão com 150 registros:
 
 | | Complex. | LOC | Autores | Churn | Imports | Cobert. |
 |---|---|---|---|---|---|---|
-| **Complex.** | 1,00 | 0,01 | 0,00 | 0,07 | 0,08 | 0,00 |
-| **LOC** | 0,01 | 1,00 | −0,04 | −0,06 | 0,04 | 0,06 |
-| **Autores** | 0,00 | −0,04 | 1,00 | −0,07 | −0,09 | −0,04 |
-| **Churn** | 0,07 | −0,06 | −0,07 | 1,00 | −0,01 | 0,01 |
-| **Imports** | 0,08 | 0,04 | −0,09 | −0,01 | 1,00 | −0,04 |
-| **Cobert.** | 0,00 | 0,06 | −0,04 | 0,01 | −0,04 | 1,00 |
+| **Complex.** | 1,000 | −0,002 | −0,002 | −0,000 | −0,001 | 0,000 |
+| **LOC** | −0,002 | 1,000 | −0,000 | −0,001 | −0,001 | −0,001 |
+| **Autores** | −0,002 | −0,000 | 1,000 | 0,000 | −0,000 | 0,000 |
+| **Churn** | −0,000 | −0,001 | 0,000 | 1,000 | −0,001 | 0,001 |
+| **Imports** | −0,001 | −0,001 | −0,000 | −0,001 | 1,000 | −0,001 |
+| **Cobert.** | 0,000 | −0,001 | 0,000 | 0,001 | −0,001 | 1,000 |
 
-Proporção de classes: **34,7 % SIM / 65,3 % NÃO** (~1:2, moderadamente
+Proporção de classes: **35,0 % SIM / 65,0 % NÃO** (~1:2, moderadamente
 desbalanceado de propósito). Detalhes do modelo generativo, estatísticas
 descritivas e a checagem de que a taxa de defeito ainda é monotônica por
 feature isolada em
@@ -109,7 +119,7 @@ feature isolada em
 ## Etapa 3 — Classificador Naive Bayes em SQL
 
 `sql/classificador_naive_bayes.sql` implementa o classificador como uma
-cadeia de `VIEW`s em SQLite:
+cadeia de `VIEW`s em DuckDB:
 
 `priors` (P(classe)) → `treino_longo` (unpivot das 6 categorias) →
 `verossimilhancas` (P(categoria\|classe) com suavização de Laplace) →
@@ -122,9 +132,10 @@ o *underflow* de multiplicar probabilidades pequenas diretamente — e
 normaliza-se o resultado de volta para uma probabilidade entre 0% e 100%.
 
 `sql/rodar_classificador.py` (re)constrói `dados/classificador.db`, importa o
-CSV da Etapa 2 e roda um *smoke test* com 2 casos de exemplo. Priors:
-**P(NÃO) = 98/150 = 0,653** · **P(SIM) = 52/150 = 0,347**. Arquitetura
-completa, view a view, em
+CSV da Etapa 2 (nativamente, via `read_csv_auto`) e roda um *smoke test* com 2
+casos de exemplo. Priors:
+**P(NÃO) = 650.000/1.000.000 = 0,6500** · **P(SIM) = 350.000/1.000.000 = 0,3500**.
+Arquitetura completa, view a view, em
 [`relatorios/etapa3_classificador.pdf`](relatorios/etapa3_classificador.pdf).
 
 ---
@@ -137,21 +148,21 @@ feature a partir da view `verossimilhancas`.
 
 | Caso | Perfil | P(SIM) | Recomendação |
 |---|---|---|---|
-| a — baixo risco claro | tudo bom | 4,28% | BAIXO RISCO |
-| b — alto risco claro | tudo ruim | 95,53% | ALTO RISCO |
-| c — ambíguo | complexidade alta × cobertura alta | 38,04% | BAIXO RISCO (fronteira) |
-| d — "armadilha" de Koru et al., sem bônus de interação | arquivo pequeno e denso | 55,52% | ALTO RISCO (por pouco) |
-| e — combinação rara | grande, simples, churn alto | 22,14% | BAIXO RISCO |
-| f — feature contestada | tudo ruim + cobertura alta | 92,64% | ALTO RISCO |
+| a — baixo risco claro | tudo bom | 4,41% | BAIXO RISCO |
+| b — alto risco claro | tudo ruim | 95,26% | ALTO RISCO |
+| c — ambíguo | complexidade alta × cobertura alta | 49,08% | BAIXO RISCO (quase 50/50) |
+| d — "armadilha" de Koru et al., sem bônus de interação | arquivo pequeno e denso | 67,26% | ALTO RISCO |
+| e — combinação rara | grande, simples, churn alto | 23,46% | BAIXO RISCO |
+| f — feature contestada | tudo ruim + cobertura alta | 92,83% | ALTO RISCO |
 
 **Poder discriminativo das features** (ranking por \|log-odds\| médio):
-nº de autores (0,695) > complexidade ciclomática (0,595) > churn relativo
-(0,482) > LOC (0,285) > cobertura de testes (0,227) > nº de imports (0,180).
+churn relativo (0,625) > nº de autores (0,592) > complexidade ciclomática
+(0,591) > nº de imports (0,241) > LOC (0,207) > cobertura de testes (0,157).
 
 **Achado central — caso d.** Sem nenhum bônus de interação plantado nos
 dados (Etapa 2), o resultado do arquivo "pequeno e denso" é exatamente a
-**soma** dos dois efeitos marginais — log-odds de LOC baixo (+0,45) mais
-log-odds de complexidade alta (+0,76) — e nada além disso. O Naive Bayes soma
+**soma** dos dois efeitos marginais — log-odds de LOC baixo (+0,36) mais
+log-odds de complexidade alta (+0,98) — e nada além disso. O Naive Bayes soma
 evidências marginais; ele não modela, para mais nem para menos, um efeito de
 interação entre features.
 
@@ -190,16 +201,19 @@ Discussão completa de cada ponto no relatório da Etapa 4.
 
 ## Como executar
 
-Requer apenas Python 3 com `numpy`, `pandas` (geração dos dados) e `sqlite3`
-(biblioteca padrão, classificador). `markdown` + `weasyprint` são necessários
-apenas para regenerar os PDFs (`relatorios/build_pdf.py`), não para rodar o
-classificador.
+Requer Python 3 com `numpy`, `pandas` (geração dos dados) e `duckdb`
+(classificador). `markdown` + `weasyprint` são necessários apenas para
+regenerar os PDFs (`relatorios/build_pdf.py`), não para rodar o classificador.
 
 ```bash
-# 1. Gerar a massa de dados sintética de treinamento (150 registros)
+# 0. Instalar dependências
+pip install -r requirements.txt
+
+# 1. Gerar a massa de dados sintética de treinamento (1.000.000 de registros —
+#    não vem no repositório, ver aviso no topo deste README)
 python3 dados/gerar_dados.py
 
-# 2. Construir o classificador e rodar o smoke test
+# 2. Construir o classificador (DuckDB) e rodar o smoke test
 python3 sql/rodar_classificador.py
 
 # 3. Rodar os 6 casos de teste formais e calcular os log-odds
@@ -207,13 +221,21 @@ python3 testes/rodar_casos_teste.py
 ```
 
 Os três scripts são idempotentes — podem ser executados quantas vezes for
-preciso, sempre com o mesmo resultado (semente fixa `SEED = 42`).
+preciso, sempre com o mesmo resultado (semente fixa `SEED = 42`). A geração da
+Etapa 1 leva poucos segundos (totalmente vetorizada em numpy); os scripts 2 e
+3 levam poucos segundos cada.
+
+**Interface visual (opcional).** Depois de rodar o passo 2 (ou 3),
+`duckdb -ui dados/classificador.db` abre uma interface local no navegador para
+inspecionar as tabelas e views (`priors`, `treino_longo`, `verossimilhancas`,
+`classificar_modulo`, ...) interativamente — útil para a apresentação oral.
 
 ## Estrutura do repositório
 
 ```
 .
 ├── CLAUDE.md                          # contexto do projeto para agentes de IA
+├── requirements.txt                   # numpy, pandas, duckdb
 ├── relatorios/                        # Etapa 1–4: .md fonte + .pdf de cada relatório
 │   ├── etapa1_modelagem.{md,pdf}      # domínio, rótulo, features, discretização
 │   ├── etapa2_dados.{md,pdf}          # metodologia da massa de dados sintética
@@ -222,11 +244,12 @@ preciso, sempre com o mesmo resultado (semente fixa `SEED = 42`).
 │   └── build_pdf.py                   # .md -> HTML com estilo -> PDF (WeasyPrint)
 ├── dados/                              # Etapa 2
 │   ├── gerar_dados.py                 # gera a massa sintética de treinamento
-│   ├── etapa2_dados_treinamento.csv   # 150 registros
+│   ├── etapa2_dados_treinamento.csv   # 1.000.000 de registros (gerado localmente,
+│   │                                   #   NÃO versionado — ver .gitignore)
 │   └── etapa2_validacao.txt           # matriz de correlação, estatísticas
 ├── sql/                                # Etapa 3
 │   ├── classificador_naive_bayes.sql  # priors, verossimilhanças, classificação
-│   └── rodar_classificador.py         # importa o CSV, roda o SQL, smoke test
+│   └── rodar_classificador.py         # importa o CSV (DuckDB), roda o SQL, smoke test
 └── testes/                             # Etapa 4
     ├── casos_teste.csv                # 6 perfis de teste
     ├── rodar_casos_teste.py           # roda os casos e calcula log-odds

@@ -1,7 +1,7 @@
 -- ======================================================================
 --  CLASSIFICADOR NAIVE BAYES EM SQL  —  Etapa 3
 --  Domínio: predição de defeitos de software a partir de métricas estáticas.
---  Banco:   SQLite (dados/classificador.db)
+--  Banco:   DuckDB (dados/classificador.db)
 -- ======================================================================
 --
 --  Este script define, NESTA ORDEM:
@@ -15,12 +15,8 @@
 --  Pré-requisito: a tabela `dados_treinamento` já deve existir e estar
 --  carregada com o CSV da Etapa 2 (feito por sql/rodar_classificador.py).
 --
---  Funções LN e EXP: nativas no SQLite >= 3.35 compilado com
---  SQLITE_ENABLE_MATH_FUNCTIONS. O ambiente-alvo (SQLite 3.45.1 do módulo
---  sqlite3 do Python) já as traz. Como garantia de portabilidade,
---  sql/rodar_classificador.py testa `SELECT ln(1)` e, se falhar, registra
---  `ln` e `exp` como funções Python (math.log / math.exp) antes de rodar
---  este script — ver comentário lá.
+--  Funções LN e EXP: nativas no DuckDB — diferente do SQLite, não é preciso
+--  nenhum fallback Python (ver CLAUDE.md, "Migração para DuckDB").
 --
 --  Todo o script é idempotente: cada objeto é derrubado (DROP ... IF EXISTS)
 --  antes de ser recriado, então pode ser reexecutado à vontade.
@@ -45,7 +41,10 @@ SELECT
     defeito                                             AS classe,
     COUNT(*)                                            AS n_classe,
     (SELECT COUNT(*) FROM dados_treinamento)            AS n_total,
-    CAST(COUNT(*) AS REAL)
+    -- DOUBLE, não REAL: no DuckDB, REAL/FLOAT4 é ponto flutuante de 32 bits
+    -- (ao contrário do SQLite, onde REAL já é um double de 8 bytes) — usar
+    -- REAL aqui introduziria artefatos de arredondamento de precisão simples.
+    CAST(COUNT(*) AS DOUBLE)
         / (SELECT COUNT(*) FROM dados_treinamento)      AS p_prior
 FROM dados_treinamento
 GROUP BY defeito;
@@ -61,10 +60,10 @@ GROUP BY defeito;
 --
 --     (modulo_id, defeito, feature, categoria)   -- 1 linha por módulo x feature
 --
--- 150 módulos x 6 features = 900 linhas. O UNION ALL empilha os 6
--- "recortes" (um por feature). Os nomes curtos de feature abaixo
--- ('complexidade', 'loc', ...) são a chave usada no resto do script e
--- também nos casos de teste (tabela caso_teste).
+-- N módulos x 6 features = 6N linhas (com N = 1.000.000, são 6.000.000 de
+-- linhas). O UNION ALL empilha os 6 "recortes" (um por feature). Os nomes
+-- curtos de feature abaixo ('complexidade', 'loc', ...) são a chave usada
+-- no resto do script e também nos casos de teste (tabela caso_teste).
 DROP VIEW IF EXISTS treino_longo;
 CREATE VIEW treino_longo AS
     SELECT modulo_id, defeito, 'complexidade' AS feature, complexidade_cat      AS categoria FROM dados_treinamento
@@ -139,7 +138,8 @@ SELECT
     p.n_classe                                                     AS total_classe,
     3                                                             AS k_laplace,
     -- fórmula de Laplace:  (contagem + 1) / (total_da_classe + k)
-    CAST(COALESCE(ct.n, 0) + 1 AS REAL) / (p.n_classe + 3)         AS p_verossimilhanca
+    -- DOUBLE (não REAL) pelo mesmo motivo do comentário em priors, acima.
+    CAST(COALESCE(ct.n, 0) + 1 AS DOUBLE) / (p.n_classe + 3)       AS p_verossimilhanca
 FROM grade g
 LEFT JOIN contagens ct
        ON ct.feature   = g.feature
@@ -246,7 +246,10 @@ WITH
     est AS (
         SELECT
             caso_id, n_features, log_sim, log_nao,
-            MAX(log_sim, log_nao)                                  AS log_max
+            -- GREATEST em vez do MAX(a, b) de 2 argumentos do SQLite: no
+            -- DuckDB, MAX() é só a função agregada; o equivalente escalar
+            -- (maior de dois valores na MESMA linha) é GREATEST().
+            GREATEST(log_sim, log_nao)                             AS log_max
         FROM pivo
     ),
     exps AS (

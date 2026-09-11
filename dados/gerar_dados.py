@@ -41,7 +41,8 @@ import pandas as pd
 # ==========================================================================
 # 1) PARÂMETROS PRINCIPAIS  (ajuste aqui — nada de valor solto no meio do código)
 # ==========================================================================
-N_REGISTROS = 150          # nº de módulos gerados (mínimo exigido pela atividade: 100)
+N_REGISTROS = 1_000_000    # nº de módulos gerados (mínimo exigido pela atividade: 100;
+                            # ver CLAUDE.md, "Migração para DuckDB e N = 1.000.000 registros")
 SEED = 42                  # semente única — usada em TODO gerador aleatório do script
 PROPORCAO_DEFEITO = 0.35   # fração de módulos com defeito=SIM (longe de 0,5 e dos extremos)
 
@@ -265,7 +266,7 @@ def validar(df):
     L.append("    Esperado: todos os |r| próximos de 0 — as 6 features são")
     L.append("    geradas independentes entre si por decisão de projeto")
     L.append("    (\"Naive Bayes puro\", ver CLAUDE.md). Valores não-nulos aqui")
-    L.append("    são ruído amostral (N=150), não dependência estrutural.")
+    L.append(f"    são ruído amostral (N={N_REGISTROS}), não dependência estrutural.")
     L.append(corr.to_string())
     L.append("")
     maior_par, maior_val = None, 0.0

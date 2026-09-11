@@ -1,46 +1,46 @@
 ======================================================================
 VALIDAÇÃO DA MASSA DE DADOS SINTÉTICA — ETAPA 2
 ======================================================================
-Parâmetros: N_REGISTROS=150  SEED=42  PROPORCAO_DEFEITO=0.35
+Parâmetros: N_REGISTROS=1000000  SEED=42  PROPORCAO_DEFEITO=0.35
 
 (a) PROPORÇÃO DE CLASSES
-    SIM :  52  ( 34.7%)
-    NAO :  98  ( 65.3%)
+    SIM : 350000  ( 35.0%)
+    NAO : 650000  ( 65.0%)
 
 (b) MATRIZ DE CORRELAÇÃO DE PEARSON (features numéricas)
     Esperado: todos os |r| próximos de 0 — as 6 features são
     geradas independentes entre si por decisão de projeto
     ("Naive Bayes puro", ver CLAUDE.md). Valores não-nulos aqui
-    são ruído amostral (N=150), não dependência estrutural.
+    são ruído amostral (N=1000000), não dependência estrutural.
                           complexidade_ciclomatica    loc  n_autores  churn_relativo  n_imports  cobertura_testes
-complexidade_ciclomatica                     1.000  0.010     -0.003           0.074      0.084            -0.002
-loc                                          0.010  1.000     -0.043          -0.063      0.038             0.057
-n_autores                                   -0.003 -0.043      1.000          -0.069     -0.087            -0.040
-churn_relativo                               0.074 -0.063     -0.069           1.000     -0.010             0.011
-n_imports                                    0.084  0.038     -0.087          -0.010      1.000            -0.037
-cobertura_testes                            -0.002  0.057     -0.040           0.011     -0.037             1.000
+complexidade_ciclomatica                     1.000 -0.002     -0.002          -0.000     -0.001             0.000
+loc                                         -0.002  1.000     -0.000          -0.001     -0.001            -0.001
+n_autores                                   -0.002 -0.000      1.000           0.000     -0.000             0.000
+churn_relativo                              -0.000 -0.001      0.000           1.000     -0.001             0.001
+n_imports                                   -0.001 -0.001     -0.000          -0.001      1.000            -0.001
+cobertura_testes                             0.000 -0.001      0.000           0.001     -0.001             1.000
 
-    -> Maior |r| da matriz: Nº de autores x Nº de imports = -0.087
+    -> Maior |r| da matriz: Complexidade ciclomática x LOC = -0.002
 
 (c) ESTATÍSTICAS DESCRITIVAS (valor bruto de cada feature)
-                            mean     std   min  median     max
-complexidade_ciclomatica   13.03   11.25   2.0    10.0    92.0
-loc                       141.77  151.64  14.0    98.5  1068.0
-n_autores                   2.56    1.16   1.0     2.5     5.0
-churn_relativo             13.63    9.96   2.5    10.0    48.8
-n_imports                   8.20    5.21   1.0     7.0    34.0
-cobertura_testes           65.62   19.93  22.4    64.5    99.0
+                            mean     std  min  median     max
+complexidade_ciclomatica   12.72   11.49  1.0     9.0   120.0
+loc                       140.39  160.19  8.0    90.0  1500.0
+n_autores                   2.55    1.24  1.0     2.0     9.0
+churn_relativo             13.83   11.55  0.4    10.5    85.0
+n_imports                   7.76    5.24  0.0     6.0    40.0
+cobertura_testes           62.80   18.50  2.0    63.0    99.0
 
 (d) TAXA DE DEFEITO POR CATEGORIA, FEATURE A FEATURE  (P(SIM))
     (cada feature isolada ainda influencia o rótulo por construção;
      o que deixou de existir é dependência ENTRE as features)
-    Taxa geral de defeito ....................  34.7%
-    LOC          : baixo=  46%  medio=  29%  alto=  38%
-    Complexidade : baixo=  22%  medio=  45%  alto=  54%
-    Churn rel.   : baixo=  29%  medio=  35%  alto=  67%
-    Nº autores   : baixo=  16%  medio=  32%  alto=  61%
-    Nº imports   : baixo=  27%  medio=  33%  alto=  40%
-    Cobertura    : baixo=  44%  medio=  31%  alto=  31%
+    Taxa geral de defeito ....................  35.0%
+    LOC          : baixo=  44%  medio=  30%  alto=  36%
+    Complexidade : baixo=  25%  medio=  43%  alto=  59%
+    Churn rel.   : baixo=  25%  medio=  41%  alto=  63%
+    Nº autores   : baixo=  21%  medio=  32%  alto=  58%
+    Nº imports   : baixo=  28%  medio=  33%  alto=  42%
+    Cobertura    : baixo=  40%  medio=  34%  alto=  30%
 
     Esperado: crescente com a categoria para complexidade, autores,
     churn e imports; em U para LOC (Koru et al., 2008 — baixo E alto
@@ -48,11 +48,11 @@ cobertura_testes           65.62   19.93  22.4    64.5    99.0
     (feature de evidência contestada) — ver pesos no topo do script.
 
 (e) DISTRIBUIÇÃO DAS CATEGORIAS
-    loc_cat               : baixo= 35  medio= 86  alto= 29
-    complexidade_cat      : baixo= 77  medio= 49  alto= 24
-    n_autores_cat         : baixo= 32  medio= 85  alto= 33
-    churn_relativo_cat    : baixo= 75  medio= 63  alto= 12
-    n_imports_cat         : baixo= 15  medio= 87  alto= 48
-    cobertura_testes_cat  : baixo= 41  medio= 67  alto= 42
+    loc_cat               : baixo=263891  medio=536282  alto=199827
+    complexidade_cat      : baixo=564885  medio=294098  alto=141017
+    n_autores_cat         : baixo=212978  medio=583221  alto=203801
+    churn_relativo_cat    : baixo=472380  medio=447377  alto=80243
+    n_imports_cat         : baixo=134327  medio=558135  alto=307538
+    cobertura_testes_cat  : baixo=245500  medio=569728  alto=184772
 
 ======================================================================

@@ -3,7 +3,7 @@
 ## Sobre a atividade
 Implementação de um Classificador Naive Bayes em SQL, aplicado a um domínio real,
 com dados de treinamento, casos de teste e reflexão crítica. Trabalho individual.
-Entrega: até 04/09/2026.
+Entrega: até 11/09/2026.
 
 Entregáveis exigidos (5 no total):
 1. Relatório de modelagem (Etapa 1)
@@ -81,6 +81,48 @@ de limitação da simulação**. A tese correta agora é:
 Todas as 6 features devem ser sorteios estatisticamente independentes uns dos
 outros.
 
+## DECISÃO DE PROJETO — Migração para DuckDB e N = 1.000.000 registros
+
+**Banco de dados: DuckDB, substituindo SQLite.** Motivo: SQLite é um motor
+*transacional* (otimizado para muitas escritas pequenas); este projeto tem o
+padrão oposto — escreve os dados uma vez, depois só faz agregação (`GROUP BY`,
+`JOIN`) repetidamente. DuckDB é um motor *analítico* (colunar), desenhado
+exatamente para esse padrão, e escala sem esforço para volumes bem maiores do
+que o SQLite seria confortável. Vantagens do SQLite que se mantêm iguais (não
+perder os argumentos já escritos nos relatórios):
+- Roda sem servidor — um arquivo, `import duckdb`, sem processo/porta/senha.
+- SQL padrão — `CREATE VIEW`, `JOIN`, CTEs (`WITH`), `UNION ALL`, `CASE`,
+  `LN`/`EXP` todos suportados nativamente.
+
+Ganhos extras da troca:
+- DuckDB tem `LN`/`EXP` nativos sem precisar do fallback Python que o SQLite
+  exigia (`connection.create_function`) — pode **remover** essa seção/ressalva
+  do relatório da Etapa 3, o código fica mais simples.
+- Importação de CSV mais direta: `read_csv_auto('arquivo.csv')` em vez de
+  laço manual de `INSERT`.
+- Interface visual local nativa (`duckdb -ui`) — útil para demonstrar as
+  views ao vivo durante a apresentação, sem precisar de ferramenta externa.
+
+**N_REGISTROS = 1.000.000.** Motivo: reduz o erro-padrão esperado de uma
+correlação nula de ≈ 0,082 (com N = 150) para ≈ 0,001 — reforça
+estatisticamente a alegação de que as 6 features são de fato independentes
+(ver "Naive Bayes puro" acima). O CSV completo (dezenas de MB) **não** deve
+ser versionado no repositório Git — manter só o gerador no repositório; quem
+quiser reproduzir os dados roda `python3 dados/gerar_dados.py` localmente,
+com a mesma semente (`SEED = 42`), obtendo exatamente o mesmo arquivo.
+Confirmado com o autor que a avaliação da atividade é sobre a apresentação
+oral, não auditoria do repositório Git — portanto isso não é um risco para
+este projeto. Adicionar o CSV grande ao `.gitignore`.
+
+**Considerado e descartado, por decisão do autor:** conjunto de teste
+separado com matriz de confusão, métricas de precisão/revocação/F1/ROC-AUC,
+curva de calibração e ablação de features (removendo 1 feature por vez). O
+caso **e** da Etapa 4 já cobre, de forma qualitativa, o propósito de "testar
+com uma combinação nunca vista no treino" — o ganho de uma avaliação
+quantitativa completa (matriz de confusão etc.) não compensava o tempo
+disponível. **Não reintroduzir essa ideia** a menos que solicitado
+explicitamente de novo.
+
 ## As 6 features
 
 | # | Feature | Ferramenta (uso real) | Fundamentação |
@@ -115,6 +157,7 @@ A atividade exige que os 100+ registros sejam **gerados por IA/sinteticamente**
 (`dados/gerar_dados.py`), não texto solto escrito por uma IA.
 
 **Modelo generativo (features 100% independentes entre si):**
+- `N_REGISTROS = 1.000.000` (ver decisão de migração para DuckDB acima).
 - Cada uma das 6 features é sorteada de sua própria distribuição, **sem depender
   do valor de nenhuma outra feature**.
 - O **rótulo** (SIM/NÃO) é a única coisa que depende das features: calcular um
@@ -197,6 +240,20 @@ escondido — ver Reflexão Crítica da Etapa 4.
 Sim — cobertura de testes tem evidência contestada na literatura quanto à sua
 relação com defeitos (Inozemtseva & Holmes, 2014; Gren & Antinyan, 2017);
 declarado como limitação assumida, não ignorada.
+
+**Por que DuckDB e não SQLite (ou Postgres)?**
+SQLite é um motor transacional; este projeto só escreve os dados uma vez e
+depois faz agregações repetidas — um padrão analítico, para o qual DuckDB
+(motor colunar) é a ferramenta certa. Postgres resolveria o volume também,
+mas exigiria servidor, sem ganho de desempenho nessa escala — complexidade
+sem benefício. DuckDB mantém tudo que já era bom no SQLite (sem servidor,
+SQL padrão) e escala melhor para 1 milhão de registros.
+
+**Por que 1 milhão de registros, se o mínimo exigido é 100?**
+Para reforçar estatisticamente a alegação de independência entre features:
+com mais dados, o erro-padrão esperado de uma correlação nula cai de ≈0,08
+(N=150) para ≈0,001 (N=1.000.000) — a matriz de correlação da Etapa 2 fica
+uma evidência bem mais forte de que as features realmente não covariam.
 
 **Se não há violação de independência nos dados, qual é a "crítica" da Etapa 4?**
 A crítica muda de "o modelo erra porque os dados violam a suposição" para

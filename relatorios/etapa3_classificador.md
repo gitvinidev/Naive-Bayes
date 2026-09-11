@@ -6,34 +6,63 @@
 | **Autor** | Marcus Viníicius Santos de Almeida |
 | **Disciplina** | Mineração de Dados |
 | **Data de entrega** | 04/09/2026 |
-| **Banco de dados** | SQLite — arquivo `dados/classificador.db` |
+| **Banco de dados** | DuckDB — arquivo `dados/classificador.db` |
 | **Artefatos** | `sql/classificador_naive_bayes.sql` · `sql/rodar_classificador.py` |
-| **Entrada de treino** | `dados/etapa2_dados_treinamento.csv` → tabela `dados_treinamento` |
+| **Entrada de treino** | `dados/etapa2_dados_treinamento.csv` → tabela `dados_treinamento` (1.000.000 de linhas) |
 
 Este relatório explica **a arquitetura** do código para apoiar a defesa oral —
 não repete o SQL linha a linha (isso está nos comentários do próprio arquivo).
-A lógica SQL não mudou desde a versão anterior deste relatório; o que mudou
-são os dados de entrada (Etapa 2, decisão "Naive Bayes puro" — ver CLAUDE.md),
-então os números de exemplo abaixo foram recalculados sobre a massa atual.
+A lógica SQL é essencialmente a mesma da versão anterior deste relatório
+(mesmas 5 views, mesma fórmula de Laplace, mesma normalização em log); o que
+mudou é (a) a migração do banco de SQLite para DuckDB e (b) os dados de
+entrada, agora N = 1.000.000 registros (ver CLAUDE.md, "Migração para DuckDB e
+N = 1.000.000 registros") — os números de exemplo abaixo foram recalculados
+sobre a massa atual.
 
 ---
 
-## 1. Por que SQLite
+## 1. Por que DuckDB
+
+SQLite é um motor **transacional**, otimizado para muitas escritas pequenas e
+intercaladas. Este projeto tem o padrão oposto: os dados são escritos **uma
+vez** (a importação do CSV) e depois só sofrem **agregação** repetida
+(`GROUP BY`, `JOIN` nas views) — exatamente o padrão para o qual um motor
+**analítico e colunar** como o DuckDB foi desenhado. Com N = 1.000.000 de
+registros (e `treino_longo` chegando a 6.000.000 de linhas — §2), esse
+descompasso deixou de ser hipotético: DuckDB escala para esse volume sem
+esforço extra, enquanto SQLite começaria a sentir o padrão de acesso errado
+para seu motor.
+
+A troca **mantém** as vantagens do SQLite que já estavam documentadas na
+versão anterior deste relatório:
 
 - **Roda sem servidor.** É um único arquivo (`classificador.db`); não há
-  processo a subir, porta a abrir nem usuário/senha. Basta a biblioteca padrão
-  do Python (`import sqlite3`).
-- **Fácil de testar no ambiente.** O script de teste cria o banco do zero,
-  importa o CSV, roda o classificador e confere o resultado em segundos — sem
-  dependências externas.
+  processo a subir, porta a abrir nem usuário/senha. Basta
+  `import duckdb`.
+- **Fácil de testar no ambiente.** O script de teste (re)cria o banco do
+  zero, importa o CSV, roda o classificador e confere o resultado em segundos
+  — sem servidor nem dependências externas de infraestrutura.
 - **SQL padrão suficiente.** O classificador usa apenas `CREATE VIEW`, `JOIN`,
-  `GROUP BY`, CTEs (`WITH`), `UNION ALL`, `CASE` e as funções `LN`/`EXP` — tudo
-  disponível no SQLite 3.45. Nada aqui depende de recurso exclusivo de um SGBD
-  específico; portar para PostgreSQL exigiria mudanças mínimas.
+  `GROUP BY`, CTEs (`WITH`), `UNION ALL`, `CASE` e as funções `LN`/`EXP` —
+  tudo disponível nativamente no DuckDB, como já era no SQLite.
 
-Custo assumido: SQLite tem tipagem fraca e não tem `PIVOT` nativo — o "unpivot"
-é feito à mão com `UNION ALL` (Seção 3.2), o que na verdade deixa a lógica mais
-explícita.
+E **ganha** três coisas na troca:
+
+1. **`LN`/`EXP` nativos, sem fallback.** O DuckDB traz essas funções
+   matemáticas nativamente; diferente do SQLite, não é preciso nenhum código
+   de contingência em Python para garanti-las (ver §4, mais abaixo — a seção
+   equivalente da versão anterior deste relatório foi removida por não ser
+   mais necessária).
+2. **Importação de CSV mais direta.** `read_csv_auto('arquivo.csv')` faz a
+   leitura, inferência de tipos e carga em uma única instrução SQL, em vez do
+   laço manual de `INSERT` linha a linha que o SQLite exigia (§2).
+3. **Interface visual nativa (`duckdb -ui`).** Útil para inspecionar as views
+   ao vivo durante a apresentação oral, sem precisar de ferramenta externa
+   (ver README).
+
+Custo assumido: assim como o SQLite, o DuckDB não tem `PIVOT` nativo para essa
+finalidade — o "unpivot" continua feito à mão com `UNION ALL` (Seção 3.2), o
+que na verdade deixa a lógica mais explícita.
 
 ---
 
@@ -41,13 +70,13 @@ explícita.
 
 ```
 CSV da Etapa 2
-   |  importa  (rodar_classificador.py)
+   |  importa  (rodar_classificador.py, via read_csv_auto)
    v
-dados_treinamento .......... 150 modulos, formato largo
+dados_treinamento .......... 1.000.000 modulos, formato largo
    |
    +--> (a) priors .......... P(SIM), P(NAO)
    |
-   +--> (b) treino_longo .... 900 linhas, formato longo
+   +--> (b) treino_longo .... 6.000.000 de linhas, formato longo
              |
              v
         (c) verossimilhancas   P(categoria | classe) + Laplace
@@ -70,10 +99,12 @@ dados_treinamento .......... 150 modulos, formato largo
 Conta quantos módulos de treino são `SIM` e quantos são `NAO` e divide pelo
 total. É o palpite inicial, antes de olhar qualquer feature.
 
-Resultado com a massa da Etapa 2: **P(NAO) = 98/150 = 0,653** e
-**P(SIM) = 52/150 = 0,347**. A proporção de classes é a mesma da versão
-anterior do dataset — o gerador fixa `PROPORCAO_DEFEITO = 0,35` via seleção
-top-k, independentemente de como as 6 features são sorteadas (Etapa 2, §1.4).
+Resultado com a massa da Etapa 2: **P(NAO) = 650.000/1.000.000 = 0,6500** e
+**P(SIM) = 350.000/1.000.000 = 0,3500**. A proporção de classes é equivalente
+à da versão anterior do dataset (então 34,7 % / 65,3 %) — o gerador fixa
+`PROPORCAO_DEFEITO = 0,35` via seleção top-k, independentemente de como as 6
+features são sorteadas (Etapa 2, §1.4); com N maior, o arredondamento de
+`round(N × 0,35)` bate exatamente em 35,0 %.
 
 ### 3.2 `treino_longo` — "unpivot" das 6 categorias
 
@@ -82,8 +113,8 @@ top-k, independentemente de como as 6 features são sorteadas (Etapa 2, §1.4).
 features com **uma** consulta em vez de seis quase iguais, empilhamos os seis
 recortes com `UNION ALL`, chegando ao formato longo:
 
-`(modulo_id, defeito, feature, categoria)` — 150 módulos × 6 features = **900
-linhas**.
+`(modulo_id, defeito, feature, categoria)` — 1.000.000 de módulos × 6 features
+= **6.000.000 de linhas**.
 
 O nome curto de cada feature (`complexidade`, `loc`, `n_autores`, `churn`,
 `n_imports`, `cobertura`) passa a ser a chave usada no resto do pipeline e
@@ -111,8 +142,8 @@ JOIN de features, categorias e classes) e só então faz `LEFT JOIN` com as
 contagens observadas — assim as combinações ausentes no treino entram com
 contagem 0 e recebem o Laplace.
 
-*Exemplo concreto:* `complexidade = alto` na classe `SIM` aparece 13 vezes;
-`P = (13 + 1) / (52 + 3) = 14/55 ≈ 0,255`.
+*Exemplo concreto:* `complexidade = alto` na classe `SIM` aparece 83.046 vezes;
+`P = (83.046 + 1) / (350.000 + 3) = 83.047/350.003 ≈ 0,2373`.
 
 ### 3.4 `score_log` — somar logaritmos em vez de multiplicar
 
@@ -156,16 +187,17 @@ A recomendação textual sai de um `CASE`:
 
 ---
 
-## 4. Funções `LN` e `EXP` no SQLite
+## 4. Funções `LN` e `EXP` no DuckDB
 
-O SQLite ≥ 3.35 traz `ln()` e `exp()` **nativas** quando compilado com
-`SQLITE_ENABLE_MATH_FUNCTIONS`. O `sqlite3` do Python usado aqui (SQLite
-**3.45.1**) já as inclui — confirmado com `SELECT ln(1), exp(0)`.
-
-Mesmo assim, por portabilidade, `rodar_classificador.py` testa essas funções ao
-abrir a conexão e, **se falharem**, registra equivalentes em Python via
-`connection.create_function("ln", 1, math.log)` e `("exp", 1, math.exp)`. O
-mesmo `.sql` roda então em qualquer build, sem alteração.
+O DuckDB traz `ln()` e `exp()` **nativas**, sem exigir nenhuma flag de build —
+confirmado com `SELECT ln(1), exp(0)`. Diferente da versão anterior deste
+relatório (SQLite), não é preciso nenhum código de contingência em Python
+(`connection.create_function`) para garantir essas funções: o `.sql` roda
+direto em qualquer instalação padrão do DuckDB. Essa seção existia na versão
+anterior por causa da possibilidade — remota, mas real no SQLite — de um
+build sem `SQLITE_ENABLE_MATH_FUNCTIONS`; no DuckDB esse cenário não existe,
+então a seção (e o código correspondente em `rodar_classificador.py`) foi
+removida.
 
 ---
 
@@ -177,8 +209,8 @@ funciona. Os 5+ casos formais e a análise crítica são da Etapa 4.
 
 | Caso | Perfil (6 categorias) | P(SIM) | P(NAO) | Recomendação |
 |---|---|---|---|---|
-| `exemplo_alto_risco` | complexidade `alto`, loc `baixo`, autores `alto`, churn `alto`, imports `alto`, cobertura `baixo` | **96,64 %** | 3,36 % | ALTO RISCO |
-| `exemplo_baixo_risco` | complexidade `baixo`, loc `medio`, autores `baixo`, churn `baixo`, imports `baixo`, cobertura `alto` | 4,28 % | **95,72 %** | BAIXO RISCO |
+| `exemplo_alto_risco` | complexidade `alto`, loc `baixo`, autores `alto`, churn `alto`, imports `alto`, cobertura `baixo` | **96,49 %** | 3,51 % | ALTO RISCO |
+| `exemplo_baixo_risco` | complexidade `baixo`, loc `medio`, autores `baixo`, churn `baixo`, imports `baixo`, cobertura `alto` | 4,41 % | **95,59 %** | BAIXO RISCO |
 
 Verificações automáticas do script (falha ⇒ código de saída 1):
 
@@ -189,8 +221,8 @@ Verificações automáticas do script (falha ⇒ código de saída 1):
   coberto → baixo risco.
 
 Log-scores obtidos (mostram o log em ação, longe de qualquer underflow):
-`exemplo_alto_risco` → ln-score SIM −8,45 vs. NAO −11,81;
-`exemplo_baixo_risco` → ln-score SIM −9,78 vs. NAO −6,67.
+`exemplo_alto_risco` → ln-score SIM −8,8923 vs. NAO −12,2072;
+`exemplo_baixo_risco` → ln-score SIM −9,9617 vs. NAO −6,8849.
 
 ---
 
@@ -203,7 +235,9 @@ python3 sql/rodar_classificador.py
 O script é idempotente: recria `dados_treinamento` a partir do CSV e derruba/cria
 todas as views (`DROP … IF EXISTS`), então pode ser rodado quantas vezes for
 preciso. Para inspecionar o modelo manualmente:
-`sqlite3 dados/classificador.db "SELECT * FROM verossimilhancas;"`.
+`duckdb dados/classificador.db "SELECT * FROM verossimilhancas;"` — ou, para
+uma interface visual local (útil na apresentação):
+`duckdb -ui dados/classificador.db`.
 
 ### Nota sobre o uso de IA
 

@@ -17,14 +17,14 @@ Não contém análise escrita — essa está em relatorios/etapa4_resultados.md.
 """
 
 import csv
-import sqlite3
+import duckdb
 import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ / "sql"))
 # funções já escritas e testadas na Etapa 3
-from rodar_classificador import garantir_math, importar_treino, FEATURES, SQL_SCRIPT  # noqa: E402
+from rodar_classificador import importar_treino, FEATURES, SQL_SCRIPT  # noqa: E402
 
 DB_PATH = RAIZ / "dados" / "classificador.db"
 CASOS_CSV = RAIZ / "testes" / "casos_teste.csv"
@@ -35,6 +35,7 @@ def carregar_casos_csv(con):
     """Lê o CSV largo e insere cada caso como 6 linhas (caso_id, feature, categoria)."""
     con.execute("DELETE FROM caso_teste;")
     casos = {}
+    linhas = []
     with open(CASOS_CSV, newline="", encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
             cid = row["caso_id"]
@@ -44,11 +45,11 @@ def carregar_casos_csv(con):
                 "perfil": {f: row[f] for f in FEATURES},
             }
             for f in FEATURES:
-                con.execute(
-                    "INSERT INTO caso_teste (caso_id, feature, categoria) VALUES (?,?,?)",
-                    (cid, f, row[f]),
-                )
-    con.commit()
+                linhas.append((cid, f, row[f]))
+    con.executemany(
+        "INSERT INTO caso_teste (caso_id, feature, categoria) VALUES (?,?,?)",
+        linhas,
+    )
     return casos
 
 
@@ -56,12 +57,12 @@ def combinacao_vista_no_treino(con, perfil):
     """Conta quantos módulos de treino têm EXATAMENTE este perfil de 6 categorias."""
     sql = """
         SELECT COUNT(*) FROM dados_treinamento
-        WHERE complexidade_cat = :complexidade
-          AND loc_cat          = :loc
-          AND n_autores_cat    = :n_autores
-          AND churn_relativo_cat = :churn
-          AND n_imports_cat    = :n_imports
-          AND cobertura_testes_cat = :cobertura
+        WHERE complexidade_cat = $complexidade
+          AND loc_cat          = $loc
+          AND n_autores_cat    = $n_autores
+          AND churn_relativo_cat = $churn
+          AND n_imports_cat    = $n_imports
+          AND cobertura_testes_cat = $cobertura
     """
     return con.execute(sql, perfil).fetchone()[0]
 
@@ -169,11 +170,10 @@ def formatar(casos_result, detalhe, ranking):
 
 
 def main():
-    con = sqlite3.connect(DB_PATH)
+    con = duckdb.connect(str(DB_PATH))
     try:
-        garantir_math(con)
         n = importar_treino(con)
-        con.executescript(SQL_SCRIPT.read_text(encoding="utf-8"))
+        con.execute(SQL_SCRIPT.read_text(encoding="utf-8"))
         casos = carregar_casos_csv(con)
         casos_result = classificar(con, casos)
         detalhe, ranking = log_odds(con)

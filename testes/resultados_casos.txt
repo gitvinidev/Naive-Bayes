@@ -5,54 +5,54 @@ ETAPA 4 — RESULTADOS DOS 6 CASOS DE TESTE + RANKING DE LOG-ODDS
 [caso_a_baixo_risco]  (a) Baixo risco claro: indicadores bons em todas as 6 features
   perfil ............: complexidade=baixo, loc=medio, n_autores=baixo, churn=baixo, n_imports=baixo, cobertura=alto
   features casadas ..: 6/6
-  perfil exato visto no treino .: 0 modulo(s)
-  log-score SIM / NAO .........: -9.7792 / -6.6711
-  P(SIM) / P(NAO) ............: 4.28% / 95.72%  (soma 100.00%)
+  perfil exato visto no treino .: 788 modulo(s)
+  log-score SIM / NAO .........: -9.9617 / -6.8849
+  P(SIM) / P(NAO) ............: 4.41% / 95.59%  (soma 100.00%)
   recomendacao ..............: BAIXO RISCO — pode seguir o fluxo normal
   intuicao esperada .........: BAIXO RISCO
 
 [caso_b_alto_risco]  (b) Alto risco claro: indicadores ruins em todas as 6 features
   perfil ............: complexidade=alto, loc=alto, n_autores=alto, churn=alto, n_imports=alto, cobertura=baixo
   features casadas ..: 6/6
-  perfil exato visto no treino .: 0 modulo(s)
-  log-score SIM / NAO .........: -8.7975 / -11.8593
-  P(SIM) / P(NAO) ............: 95.53% / 4.47%  (soma 100.00%)
+  perfil exato visto no treino .: 32 modulo(s)
+  log-score SIM / NAO .........: -9.3598 / -12.3601
+  P(SIM) / P(NAO) ............: 95.26% / 4.74%  (soma 100.00%)
   recomendacao ..............: ALTO RISCO — recomenda-se revisão de código e testes adicionais
   intuicao esperada .........: ALTO RISCO
 
 [caso_c_ambiguo]  (c) Ambiguo: complexidade alta e cobertura alta ao mesmo tempo; resto no meio
   perfil ............: complexidade=alto, loc=medio, n_autores=medio, churn=medio, n_imports=medio, cobertura=alto
   features casadas ..: 6/6
-  perfil exato visto no treino .: 1 modulo(s)
-  log-score SIM / NAO .........: -6.6983 / -6.2104
-  P(SIM) / P(NAO) ............: 38.04% / 61.96%  (soma 100.00%)
+  perfil exato visto no treino .: 2093 modulo(s)
+  log-score SIM / NAO .........: -7.0037 / -6.9669
+  P(SIM) / P(NAO) ............: 49.08% / 50.92%  (soma 100.00%)
   recomendacao ..............: BAIXO RISCO — pode seguir o fluxo normal
   intuicao esperada .........: INDEFINIDO (perto de 50/50)
 
 [caso_d_koru_pequeno_denso]  (d) Armadilha de Koru: arquivo pequeno (LOC baixo) porem denso (complexidade alta)
   perfil ............: complexidade=alto, loc=baixo, n_autores=medio, churn=medio, n_imports=medio, cobertura=medio
   features casadas ..: 6/6
-  perfil exato visto no treino .: 0 modulo(s)
-  log-score SIM / NAO .........: -6.6712 / -6.8929
-  P(SIM) / P(NAO) ............: 55.52% / 44.48%  (soma 100.00%)
+  perfil exato visto no treino .: 3159 modulo(s)
+  log-score SIM / NAO .........: -6.1001 / -6.8203
+  P(SIM) / P(NAO) ............: 67.26% / 32.74%  (soma 100.00%)
   recomendacao ..............: ALTO RISCO — recomenda-se revisão de código e testes adicionais
   intuicao esperada .........: ALTO RISCO (pequeno nao e seguro)
 
 [caso_e_raro_laplace]  (e) Combinacao rara/fronteira: arquivo grande porem simples + churn alto + resto bom
   perfil ............: complexidade=baixo, loc=alto, n_autores=baixo, churn=alto, n_imports=baixo, cobertura=alto
   features casadas ..: 6/6
-  perfil exato visto no treino .: 0 modulo(s)
-  log-score SIM / NAO .........: -11.4906 / -10.2333
-  P(SIM) / P(NAO) ............: 22.14% / 77.86%  (soma 100.00%)
+  perfil exato visto no treino .: 47 modulo(s)
+  log-score SIM / NAO .........: -11.6210 / -10.4386
+  P(SIM) / P(NAO) ............: 23.46% / 76.54%  (soma 100.00%)
   recomendacao ..............: BAIXO RISCO — pode seguir o fluxo normal
   intuicao esperada .........: BAIXO/INDEFINIDO
 
 [caso_f_cobertura_contestada]  (f) Feature contestada: alto risco em tudo exceto cobertura de testes (alta)
   perfil ............: complexidade=alto, loc=alto, n_autores=alto, churn=alto, n_imports=alto, cobertura=alto
   features casadas ..: 6/6
-  perfil exato visto no treino .: 0 modulo(s)
-  log-score SIM / NAO .........: -9.1029 / -11.6362
-  P(SIM) / P(NAO) ............: 92.64% / 7.36%  (soma 100.00%)
+  perfil exato visto no treino .: 27 modulo(s)
+  log-score SIM / NAO .........: -9.9288 / -12.4899
+  P(SIM) / P(NAO) ............: 92.83% / 7.17%  (soma 100.00%)
   recomendacao ..............: ALTO RISCO — recomenda-se revisão de código e testes adicionais
   intuicao esperada .........: ALTO RISCO (cobertura nao deve salvar)
 
@@ -61,34 +61,34 @@ LOG-ODDS POR CATEGORIA   ln( P(cat|SIM) / P(cat|NAO) )
   ( > 0  => categoria empurra para SIM ;  < 0 => empurra para NAO )
 ------------------------------------------------------------------------
   feature       categoria   P(cat|SIM)  P(cat|NAO)    log-odds
-  churn         alto            0.1636      0.0495      1.1956
-  churn         baixo           0.4182      0.5347     -0.2457
-  churn         medio           0.4182      0.4158      0.0056
-  cobertura     alto            0.2545       0.297     -0.1544
-  cobertura     baixo           0.3455      0.2376      0.3742
-  cobertura     medio              0.4      0.4653     -0.1513
-  complexidade  alto            0.2545      0.1188      0.7619
-  complexidade  baixo           0.3273       0.604     -0.6127
-  complexidade  medio           0.4182      0.2772      0.4111
-  loc           alto            0.2182      0.1881      0.1483
-  loc           baixo           0.3091       0.198      0.4453
-  loc           medio           0.4727      0.6139     -0.2613
-  n_autores     alto            0.3818      0.1386      1.0133
-  n_autores     baixo           0.1091      0.2772     -0.9327
-  n_autores     medio           0.5091      0.5842     -0.1375
-  n_imports     alto            0.3636       0.297      0.2023
-  n_imports     baixo           0.0909      0.1188     -0.2677
-  n_imports     medio           0.5455      0.5842     -0.0686
+  churn         alto            0.1445      0.0457      1.1517
+  churn         baixo           0.3362      0.5457     -0.4844
+  churn         medio           0.5193      0.4086      0.2397
+  cobertura     alto            0.1598      0.1982     -0.2158
+  cobertura     baixo           0.2822      0.2257      0.2234
+  cobertura     medio            0.558       0.576     -0.0318
+  complexidade  alto            0.2373      0.0892      0.9785
+  complexidade  baixo           0.4049      0.6511     -0.4751
+  complexidade  medio           0.3579      0.2598      0.3204
+  loc           alto             0.206      0.1965      0.0472
+  loc           baixo           0.3288       0.229      0.3619
+  loc           medio           0.4652      0.5745     -0.2111
+  n_autores     alto             0.336      0.1326      0.9298
+  n_autores     baixo           0.1259      0.2599     -0.7246
+  n_autores     medio           0.5381      0.6075     -0.1214
+  n_imports     alto            0.3674      0.2753      0.2887
+  n_imports     baixo           0.1058      0.1497     -0.3468
+  n_imports     medio           0.5268       0.575     -0.0877
 
 ------------------------------------------------------------------------
 RANKING DAS FEATURES POR PODER DISCRIMINATIVO ( |log-odds| medio )
 ------------------------------------------------------------------------
   #  feature           |log-odds| medio  |log-odds| max
-  1  n_autores                   0.6945          1.0133
-  2  complexidade                0.5952          0.7619
-  3  churn                       0.4823          1.1956
-  4  loc                         0.2849          0.4453
-  5  cobertura                   0.2266          0.3742
-  6  n_imports                   0.1795          0.2677
+  1  churn                       0.6253          1.1517
+  2  n_autores                    0.592          0.9298
+  3  complexidade                0.5913          0.9785
+  4  n_imports                   0.2411          0.3468
+  5  loc                         0.2067          0.3619
+  6  cobertura                    0.157          0.2234
 
 ========================================================================

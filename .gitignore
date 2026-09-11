@@ -1,5 +1,11 @@
-# Banco de dados SQLite — é reconstruído do zero a cada execução
+# Banco de dados DuckDB — é reconstruído do zero a cada execução
 dados/classificador.db
+
+# Massa de dados sintética completa (1.000.000 de registros, dezenas de MB).
+# Não é versionada no Git: é 100% reproduzível rodando `python3
+# dados/gerar_dados.py` localmente com a mesma semente fixa (SEED = 42) —
+# ver CLAUDE.md, "Migração para DuckDB e N = 1.000.000 registros".
+dados/etapa2_dados_treinamento.csv
 
 # Cache do Python
 __pycache__/
